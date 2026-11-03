@@ -1,0 +1,5 @@
+- [ ] sms_robot_v1.py dosyasını panel (tkinter) ile güncelle
+- [ ] Duraklat/Devam Et toggle butonu ekle
+- [ ] Kapat butonu ekle ve özet popup göster
+- [ ] Panelde adet+yüzde canlı istatistikleri göster
+- [ ] Mevcut işlenen bildirim bilgisini panelde göster

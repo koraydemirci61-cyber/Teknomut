@@ -1,0 +1,22 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\koray.demirci\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+    "python.analysis.extraPaths": [
+        "Depkont",
+        "C:\\Users\\koray.demirci\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages",
+        "C:\\Users\\koray.demirci\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\win32",
+        "C:\\Users\\koray.demirci\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\win32\\lib"
+    ],
+    "cloude-code-toolbox.safetyGuards.enabled": false,
+    "cloude-code-toolbox.tokenOptimization.enabled": true,
+    "cloude-code-toolbox.intelligence.autoScanMcpSkillsOnWorkspaceOpen": true,
+    "cloude-code-toolbox.thinkingMachineMode.enabled": true,
+    "cloude-code-toolbox.thinkingMachineMode.runAwarenessScan": true,
+    "cloude-code-toolbox.thinkingMachineMode.mergeAwarenessIntoClaudeMd": true,
+    "cloude-code-toolbox.thinkingMachineMode.showConfirmationModal": true,
+    "cloude-code-toolbox.thinkingMachineMode.useSeparateContextPackDefaults": true,
+    "cloude-code-toolbox.thinkingMachineMode.includeGit": true,
+    "cloude-code-toolbox.thinkingMachineMode.includeDiagnostics": true,
+    "cloude-code-toolbox.thinkingMachineMode.appendNotepad": true,
+    "cloude-code-toolbox.thinkingMachineMode.openChat": true
+}
+
