@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Mutabakat Listesi — Teknosa Mutabakat Portalı{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Üst Başlık ve Butonlar -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800 tracking-tight">Teknosa Buyback Mutabakat Kayıtları</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Toplam <strong>{{ "{:,}".format(total_count) }}</strong> kayıt bulundu (Sayfa {{ page }} / {{ total_pages }})</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="/export/excel?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}"
+               class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-file-excel"></i>
+                <span>Excel Olarak İndir</span>
+            </a>
+            {% if current_user.role == 'admin' %}
+            <a href="/import/daily"
+               class="bg-orange-600 hover:bg-orange-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Günlük Veri Yükle</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Arama ve Filtre Formu -->
+    <form method="GET" action="/mutabakat" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <!-- Arama Kelimesi -->
+        <div class="md:col-span-2 relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            </div>
+            <input type="text" name="q" value="{{ q }}" placeholder="IMEI, Müşteri Adı, Mağaza veya Model ara..."
+                   class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+        </div>
+
+        <!-- Statü Filtresi -->
+        <div>
+            <select name="status" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition" onchange="this.form.submit()">
+                <option value="">Tüm Statüler</option>
+                <option value="Mutabakat tamamlandı" {% if status_filter == 'Mutabakat tamamlandı' %}selected{% endif %}>Mutabakat Tamamlandı</option>
+                <option value="Cevap bekleniyor" {% if status_filter == 'Cevap bekleniyor' %}selected{% endif %}>Cevap Bekleniyor</option>
+                <option value="İptal" {% if status_filter == 'İptal' %}selected{% endif %}>İptal</option>
+            </select>
+        </div>
+
+        <!-- Fark Durumu Filtresi -->
+        <div class="flex gap-2">
+            <select name="diff" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition" onchange="this.form.submit()">
+                <option value="">Tüm Fark Durumları</option>
+                <option value="has_diff" {% if diff_filter == 'has_diff' %}selected{% endif %}>Farkı Olanlar (Uyuşmazlık)</option>
+                <option value="negative" {% if diff_filter == 'negative' %}selected{% endif %}>Negatif Fark (Çek > Hakediş)</option>
+                <option value="positive" {% if diff_filter == 'positive' %}selected{% endif %}>Pozitif Fark (Hakediş > Çek)</option>
+                <option value="zero" {% if diff_filter == 'zero' %}selected{% endif %}>Farksız / Birebir Eşit</option>
+            </select>
+            <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition">
+                Filtrele
+            </button>
+        </div>
+    </form>
+
+    <!-- Kayıtlar Tablosu -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                        <th class="py-3 px-3.5 font-bold">IMEI / Cihaz</th>
+                        <th class="py-3 px-3.5 font-bold">Müşteri</th>
+                        <th class="py-3 px-3 font-bold">Mağaza</th>
+                        <th class="py-3 px-3 font-bold text-right">Verilen Çek</th>
+                        <th class="py-3 px-3 font-bold text-center">Eksi Puan</th>
+                        <th class="py-3 px-3 font-bold text-right">Hakediş (Fiyat)</th>
+                        <th class="py-3 px-3 font-bold text-right">Fark</th>
+                        <th class="py-3 px-3.5 font-bold text-center">Statü</th>
+                        <th class="py-3 px-4 font-bold text-right">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for r in records %}
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <!-- IMEI & Model -->
+                        <td class="py-3 px-3.5">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-mono font-bold text-slate-900">{{ r.imei }}</span>
+                                {% if r.is_duplicate %}
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-300" title="Bu IMEI birden fazla girilmiş!">ÇİFT</span>
+                                {% endif %}
+                            </div>
+                            <div class="font-semibold text-slate-700 text-[11px] mt-0.5">{{ r.model or '-' }}</div>
+                            <span class="text-[10px] text-slate-400">{{ r.brand }}</span>
+                        </td>
+
+                        <!-- Müşteri -->
+                        <td class="py-3 px-3.5">
+                            <div class="font-bold text-slate-800">{{ r.customer_name or '-' }}</div>
+                            <span class="text-[10px] text-slate-400 font-mono">{{ r.phone or r.tc_no or '' }}</span>
+                        </td>
+
+                        <!-- Mağaza -->
+                        <td class="py-3 px-3">
+                            <span class="font-medium text-slate-700 block truncate max-w-[170px]" title="{{ r.store_name }}">{{ r.store_name or '-' }}</span>
+                            <span class="text-[10px] text-slate-400">{{ r.process_start_date or r.delivery_date or '' }}</span>
+                        </td>
+
+                        <!-- Çek Tutarı -->
+                        <td class="py-3 px-3 text-right font-mono font-medium text-slate-800">
+                            {{ "{:,.2f}".format(r.voucher_amount) }} ₺
+                        </td>
+
+                        <!-- Eksi Puan -->
+                        <td class="py-3 px-3 text-center">
+                            {% if r.penalty_points > 0 %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                -%{{ r.penalty_points|int }}
+                            </span>
+                            {% else %}
+                            <span class="text-slate-400 font-mono">0</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Hakediş (Fiyat) -->
+                        <td class="py-3 px-3 text-right font-mono font-bold text-emerald-700">
+                            {{ "{:,.2f}".format(r.calculated_price) }} ₺
+                        </td>
+
+                        <!-- Fark -->
+                        <td class="py-3 px-3 text-right font-mono font-bold {% if r.difference_amount < 0 %}text-rose-600{% elif r.difference_amount > 0 %}text-emerald-600{% else %}text-slate-400{% endif %}">
+                            {{ "{:,.2f}".format(r.difference_amount) }} ₺
+                        </td>
+
+                        <!-- Statü -->
+                        <td class="py-3 px-3.5 text-center">
+                            {% if r.reconciliation_status == 'Mutabakat tamamlandı' %}
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Mutabakat tamamlandı
+                            </span>
+                            {% elif r.reconciliation_status == 'İptal' %}
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                İptal
+                            </span>
+                            {% else %}
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                {{ r.reconciliation_status or 'Cevap bekleniyor' }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Butonlar -->
+                        <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                            <a href="/mutabakat/{{ r.id }}" class="inline-flex items-center text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition" title="Detay & Fiş Görüntüle">
+                                <i class="fa-solid fa-file-invoice text-xs"></i>
+                            </a>
+                            <a href="/mutabakat/{{ r.id }}/edit" class="inline-flex items-center text-orange-600 hover:bg-orange-50 p-1.5 rounded-lg transition" title="Puanları ve Soruları Düzenle">
+                                <i class="fa-solid fa-sliders text-xs"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="p-8 text-center text-slate-400">
+                            <i class="fa-solid fa-folder-open text-2xl mb-2 block"></i>
+                            <span>Aradığınız kriterlere uygun kayıt bulunamadı.</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Sayfalama (Pagination) -->
+        {% if total_pages > 1 %}
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+            <span class="text-slate-500">
+                Sayfa <strong>{{ page }}</strong> / <strong>{{ total_pages }}</strong>
+            </span>
+            <div class="flex items-center space-x-1.5">
+                {% if page > 1 %}
+                <a href="/mutabakat?page=1&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">« İlk</a>
+                <a href="/mutabakat?page={{ page - 1 }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">‹ Önceki</a>
+                {% endif %}
+
+                <span class="px-3 py-1.5 rounded-lg bg-orange-600 text-white font-bold">{{ page }}</span>
+
+                {% if page < total_pages %}
+                <a href="/mutabakat?page={{ page + 1 }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">Sonraki ›</a>
+                <a href="/mutabakat?page={{ total_pages }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">Son »</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+</div>
+{% endblock %}

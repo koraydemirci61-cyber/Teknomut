@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Cihaz Düzenle — {{ record.imei }}{% else %}Yeni Cihaz Girişi{% endif %} — Teknosa Mutabakat Portalı{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto pb-20">
+
+    <!-- Üst Başlık -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+        <div class="flex items-center space-x-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-xl shadow-md">
+                <i class="fa-solid {% if is_edit %}fa-pen-to-square{% else %}fa-plus-circle{% endif %}"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">
+                    {% if is_edit %}Mutabakat Kaydı ve Test Soruları Düzenleme{% else %}Yeni Buyback Cihaz Girişi ve Puanlama{% endif %}
+                </h1>
+                <p class="text-xs text-slate-500">
+                    {% if is_edit %}IMEI: <span class="font-mono font-bold text-slate-700">{{ record.imei }}</span> — {{ record.customer_name }}{% else %}Geri alım yapılan cihazın kontrollerini yapıp hakedişini hesaplayın{% endif %}
+                </p>
+            </div>
+        </div>
+        <a href="/mutabakat" class="text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center space-x-1">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Listeye Dön</span>
+        </a>
+    </div>
+
+    <!-- Yapışkan (Sticky) Canlı Hakediş ve Fark Hesaplama Barı -->
+    <div class="sticky top-20 z-30 bg-slate-900/95 text-white backdrop-blur-md p-4 rounded-2xl shadow-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-6">
+            <!-- Eksi Puan -->
+            <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Toplam Eksi Puan</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="livePenalty" class="text-2xl font-black text-amber-400 font-mono">-%0</span>
+                </div>
+            </div>
+
+            <div class="h-8 w-px bg-slate-700"></div>
+
+            <!-- Hesaplanan Hakediş -->
+            <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Hesaplanan Hakediş (AS)</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="livePrice" class="text-2xl font-black text-emerald-400 font-mono">0.00 ₺</span>
+                </div>
+            </div>
+
+            <div class="h-8 w-px bg-slate-700"></div>
+
+            <!-- Fark -->
+            <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Fark Tutarı (AV)</span>
+                <div class="flex items-baseline space-x-1">
+                    <span id="liveDiff" class="text-2xl font-black text-white font-mono">0.00 ₺</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button type="button" onclick="document.getElementById('mutabakatForm').submit();"
+                    class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition flex items-center space-x-2">
+                <i class="fa-solid fa-floppy-disk text-sm"></i>
+                <span>Kaydı Tamamla ve Sakla</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form id="mutabakatForm" action="{% if is_edit %}/mutabakat/{{ record.id }}/edit{% else %}/mutabakat/new{% endif %}" method="POST" class="space-y-6">
+        
+        <!-- 1. Müşteri ve Mağaza Bilgileri -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-orange-600 mb-4 flex items-center">
+                <i class="fa-solid fa-user-tag mr-2"></i> Müşteri ve İşlem Bilgileri
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Müşteri Adı Soyadı *</label>
+                    <input type="text" name="customer_name" required value="{{ record.customer_name if is_edit else '' }}" placeholder="Örn: Ahmet Yılmaz"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">T.C. Kimlik No</label>
+                    <input type="text" name="tc_no" value="{{ record.tc_no if is_edit else '' }}" placeholder="11 haneli T.C. No"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Müşteri Telefon</label>
+                    <input type="text" name="phone" value="{{ record.phone if is_edit else '' }}" placeholder="905xxxxxxxxx"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">İşlem Yapan Mağaza *</label>
+                    <input type="text" name="store_name" required value="{{ record.store_name if is_edit else 'Teknosa Mağazası' }}" placeholder="Mağaza adı"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">İşlemi Yapan Kullanıcı</label>
+                    <input type="text" name="process_user" value="{{ record.process_user if is_edit else current_user.full_name }}"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">İşlem Tarihi</label>
+                    <input type="date" name="process_start_date" value="{{ record.process_start_date[:10] if is_edit and record.process_start_date else today_str }}"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Cihaz Bilgileri ve Ücretler -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-orange-600 mb-4 flex items-center">
+                <i class="fa-solid fa-mobile mr-2"></i> Cihaz ve Finansal Bilgiler
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- IMEI -->
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">IMEI Numarası (15 Hane) *</label>
+                    <div class="relative">
+                        <input type="text" id="imeiInput" name="imei" required value="{{ record.imei if is_edit else '' }}" placeholder="15 haneli IMEI girin"
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
+                               oninput="checkDuplicateImei(this.value)">
+                    </div>
+                    <div id="imeiAlert" class="mt-1.5 text-xs text-rose-600 font-bold hidden flex items-center space-x-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span id="imeiAlertText">Bu IMEI veritabanında daha önce kayıt edilmiş (ÇİFT ADET UYARISI)!</span>
+                    </div>
+                </div>
+
+                <!-- Marka -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Marka *</label>
+                    <select id="brandSelect" name="brand" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500" onchange="toggleQuestionsByBrand(this.value)">
+                        <option value="APPLE" {% if is_edit and record.brand == 'APPLE' %}selected{% endif %}>APPLE</option>
+                        <option value="SAMSUNG" {% if is_edit and record.brand == 'SAMSUNG' %}selected{% endif %}>SAMSUNG</option>
+                        <option value="XIAOMI" {% if is_edit and record.brand == 'XIAOMI' %}selected{% endif %}>XIAOMI</option>
+                        <option value="HUAWEI" {% if is_edit and record.brand == 'HUAWEI' %}selected{% endif %}>HUAWEI</option>
+                        <option value="DİĞER" {% if is_edit and record.brand not in ['APPLE', 'SAMSUNG', 'XIAOMI', 'HUAWEI'] %}selected{% endif %}>DİĞER</option>
+                    </select>
+                </div>
+
+                <!-- Model -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Model Adı *</label>
+                    <input type="text" id="modelInput" name="model" list="modelsList" required value="{{ record.model if is_edit else '' }}" placeholder="Örn: iPhone 11 64GB"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500" onchange="lookupModelPrice(this.value)">
+                    <datalist id="modelsList">
+                        {% for m in model_list %}
+                        <option value="{{ m.model_name }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <!-- Tam Değer (Tavan Fiyat - AU) -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Liste / Tavan Değeri (AU ₺) *</label>
+                    <input type="number" step="0.01" id="fullPriceInput" name="full_price" required value="{{ record.full_price if is_edit else 0 }}"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-orange-500" oninput="recalcValuation()">
+                </div>
+
+                <!-- Verilen Çek Tutarı (U) -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Verilen Çek Tutarı (U ₺) *</label>
+                    <input type="number" step="0.01" id="voucherAmountInput" name="voucher_amount" required value="{{ record.voucher_amount if is_edit else 0 }}"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-orange-500" oninput="recalcValuation()">
+                </div>
+
+                <!-- Çek No -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Hediye Çeki No</label>
+                    <input type="text" name="voucher_no" value="{{ record.voucher_no if is_edit else '' }}" placeholder="8124********0000"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono">
+                </div>
+
+                <!-- Mutabakat Statüsü -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Mutabakat Statüsü</label>
+                    <select name="reconciliation_status" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500">
+                        <option value="Mutabakat tamamlandı" {% if is_edit and record.reconciliation_status == 'Mutabakat tamamlandı' %}selected{% endif %}>Mutabakat tamamlandı</option>
+                        <option value="Cevap bekleniyor" {% if (is_edit and record.reconciliation_status == 'Cevap bekleniyor') or not is_edit %}selected{% endif %}>Cevap bekleniyor</option>
+                        <option value="İptal" {% if is_edit and record.reconciliation_status == 'İptal' %}selected{% endif %}>İptal</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Cihaz Test ve Hasar Soruları (Eksi Puan Hesaplama) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-orange-600 flex items-center">
+                        <i class="fa-solid fa-list-check mr-2"></i> Cihaz Fonksiyon ve Hasar Soruları
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Seçilen cevaplara göre Eksi Puan ve Hakediş formülü otomatik çalışır.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                {% for q in questions %}
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition question-card" data-device-group="{{ q.device_group or 'ALL' }}">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex-grow">
+                            <span class="font-bold text-slate-800 text-xs block">{{ q.title }}</span>
+                        </div>
+                        <div class="sm:w-72 shrink-0">
+                            <select id="{{ q.id }}" name="{{ q.id }}" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-orange-500 question-input" onchange="recalcValuation()">
+                                {% for opt in q.options %}
+                                <option value="{{ opt.val }}" {% if is_edit and record[q.id] == opt.val %}selected{% endif %}>
+                                    {{ opt.label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 4. Notlar ve Orijinallik Teyidi -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-orange-600 mb-4 flex items-center">
+                <i class="fa-solid fa-clipboard-check mr-2"></i> Orijinallik ve Açıklama
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Ekran Orijinal mi?</label>
+                    <select name="screen_original" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+                        <option value="">Belirtilmemiş</option>
+                        <option value="Evet" {% if is_edit and record.screen_original == 'Evet' %}selected{% endif %}>Evet</option>
+                        <option value="Hayır" {% if is_edit and record.screen_original == 'Hayır' %}selected{% endif %}>Hayır</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Kamera Orijinal mi?</label>
+                    <select name="camera_original" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+                        <option value="">Belirtilmemiş</option>
+                        <option value="Evet" {% if is_edit and record.camera_original == 'Evet' %}selected{% endif %}>Evet</option>
+                        <option value="Hayır" {% if is_edit and record.camera_original == 'Hayır' %}selected{% endif %}>Hayır</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Pil Orijinal mi?</label>
+                    <select name="battery_original" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs">
+                        <option value="">Belirtilmemiş</option>
+                        <option value="Evet" {% if is_edit and record.battery_original == 'Evet' %}selected{% endif %}>Evet</option>
+                        <option value="Hayır" {% if is_edit and record.battery_original == 'Hayır' %}selected{% endif %}>Hayır</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Operatör Açıklaması / İnceleme Notu</label>
+                <textarea name="notes" rows="3" placeholder="Mutabakat veya cihaz hasarı ile ilgili açıklama..."
+                          class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">{{ record.notes if is_edit else '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Butonlar -->
+        <div class="flex items-center justify-between pt-2">
+            {% if is_edit %}
+            <button type="button" onclick="if(confirm('Bu mutabakat kaydını silmek istediğinize emin misiniz?')) { document.getElementById('deleteForm').submit(); }"
+                    class="text-rose-600 hover:text-rose-700 text-xs font-bold flex items-center space-x-1">
+                <i class="fa-solid fa-trash"></i>
+                <span>Kaydı Sil</span>
+            </button>
+            {% else %}
+            <div></div>
+            {% endif %}
+
+            <div class="flex items-center space-x-3">
+                <a href="/mutabakat" class="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
+                    İptal
+                </a>
+                <button type="submit"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition flex items-center space-x-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span>{% if is_edit %}Güncellemeleri Kaydet{% else %}Mutabakat Kaydını Oluştur{% endif %}</span>
+                </button>
+            </div>
+        </div>
+
+    </form>
+
+    {% if is_edit %}
+    <form id="deleteForm" action="/mutabakat/{{ record.id }}/delete" method="POST" class="hidden"></form>
+    {% endif %}
+
+</div>
+
+<script>
+    // Model Fiyat Listesi Sözlüğü (JS)
+    const modelPrices = {
+        {% for m in model_list %}
+        '{{ m.model_name|replace("'", "\\'") }}': {{ m.full_price }},
+        {% endfor %}
+    };
+
+    function lookupModelPrice(modelName) {
+        if (!modelName) return;
+        const cleanName = modelName.trim();
+        if (modelPrices[cleanName] !== undefined) {
+            document.getElementById('fullPriceInput').value = modelPrices[cleanName];
+            recalcValuation();
+        }
+    }
+
+    function toggleQuestionsByBrand(brand) {
+        brand = (brand || '').toUpperCase();
+        const cards = document.querySelectorAll('.question-card');
+        cards.forEach(c => {
+            const grp = c.dataset.deviceGroup;
+            if (grp === 'ALL') {
+                c.style.display = '';
+            } else if (grp === 'APPLE') {
+                c.style.display = (brand === 'APPLE') ? '' : 'none';
+                if (brand !== 'APPLE') {
+                    // Reset apple questions
+                    c.querySelectorAll('select').forEach(s => s.value = '');
+                }
+            } else if (grp === 'ANDROID') {
+                c.style.display = (brand !== 'APPLE') ? '' : 'none';
+                if (brand === 'APPLE') {
+                    // Reset android questions
+                    c.querySelectorAll('select').forEach(s => s.value = '');
+                }
+            }
+        });
+        recalcValuation();
+    }
+
+    async function checkDuplicateImei(imei) {
+        if (!imei || imei.trim().length < 8) {
+            document.getElementById('imeiAlert').classList.add('hidden');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/check-imei?imei=' + encodeURIComponent(imei.trim()) + '{% if is_edit %}&exclude_id={{ record.id }}{% endif %}');
+            const data = await resp.json();
+            const alertBox = document.getElementById('imeiAlert');
+            if (data.is_duplicate) {
+                document.getElementById('imeiAlertText').innerText = `DİKKAT: Bu IMEI daha önce ${data.count} kez kaydedilmiş (Mağaza: ${data.store_name})!`;
+                alertBox.classList.remove('hidden');
+            } else {
+                alertBox.classList.add('hidden');
+            }
+        } catch (e) {
+            console.error('IMEI check error', e);
+        }
+    }
+
+    function recalcValuation() {
+        let penalty = 0.0;
+
+        // Q1-Q4
+        const q1 = document.getElementById('q1_working')?.value;
+        if (q1 === 'Y') penalty += 100.0;
+        const q2 = document.getElementById('q2_btk')?.value;
+        if (q2 === 'Y') penalty += 100.0;
+        const q3 = document.getElementById('q3_home_faceid')?.value;
+        if (q3 === 'Y') penalty += 40.0;
+        const q4 = document.getElementById('q4_icloud')?.value;
+        if (q4 === 'Y') penalty += 70.0;
+
+        // Apple
+        const al = document.getElementById('q5_apple_body')?.value;
+        if (al === 'Y') penalty += 15.0; else if (al === 'D') penalty += 10.0;
+        const am = document.getElementById('q6_apple_screen')?.value;
+        if (am === 'Y') penalty += 40.0; else if (am === 'D') penalty += 15.0;
+        const an = document.getElementById('q7_apple_camera')?.value;
+        if (an === 'Y') penalty += 25.0; else if (an === 'D') penalty += 15.0;
+        const ao = document.getElementById('q8_apple_battery')?.value;
+        if (ao === 'Y') penalty += 25.0; else if (ao === 'D') penalty += 15.0;
+
+        // Android
+        const ap = document.getElementById('q5_android_camera')?.value;
+        if (ap === 'Y') penalty += 40.0;
+        const aq = document.getElementById('q6_android_body')?.value;
+        if (aq === 'Y') penalty += 20.0; else if (aq === 'D') penalty += 15.0;
+        const ar = document.getElementById('q7_android_screen')?.value;
+        if (ar === 'Y') penalty += 40.0; else if (ar === 'D') penalty += 20.0;
+
+        // Update live penalty display
+        document.getElementById('livePenalty').innerText = '-%' + penalty.toFixed(0);
+
+        // Valuation
+        const fullPrice = parseFloat(document.getElementById('fullPriceInput')?.value) || 0;
+        const voucherAmount = parseFloat(document.getElementById('voucherAmountInput')?.value) || 0;
+
+        let calcPrice = 0.0;
+        if (fullPrice > 0) {
+            if (penalty > 90.0) {
+                calcPrice = Math.ceil((fullPrice / 100.0) * 10.0);
+            } else {
+                const ratio = Math.max(0.0, 100.0 - penalty);
+                calcPrice = Math.ceil((fullPrice / 100.0) * ratio);
+            }
+        }
+
+        const diff = calcPrice - voucherAmount;
+
+        document.getElementById('livePrice').innerText = calcPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+        
+        const liveDiffEl = document.getElementById('liveDiff');
+        liveDiffEl.innerText = diff.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+        
+        if (diff < 0) {
+            liveDiffEl.className = 'text-2xl font-black text-rose-400 font-mono';
+        } else if (diff > 0) {
+            liveDiffEl.className = 'text-2xl font-black text-emerald-400 font-mono';
+        } else {
+            liveDiffEl.className = 'text-2xl font-black text-white font-mono';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const brand = document.getElementById('brandSelect')?.value || 'APPLE';
+        toggleQuestionsByBrand(brand);
+        recalcValuation();
+    });
+</script>
+{% endblock %}

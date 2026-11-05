@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Teknosa Mutabakat Portalı{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        tekno: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; font-size: 10pt; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+    
+    <!-- Üst Menü -->
+    {% if current_user %}
+    <nav class="bg-tekno-800 text-white shadow-lg sticky top-0 z-40 no-print border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                
+                <!-- Logo & Başlık -->
+                <div class="flex items-center space-x-3">
+                    <a href="/dashboard" class="flex items-center space-x-2.5 group">
+                        <div class="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center shadow-md group-hover:bg-orange-600 transition">
+                            <i class="fa-solid fa-mobile-screen text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <span class="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
+                                TEKNOSA <span class="text-orange-400 font-semibold text-xs px-1.5 py-0.5 bg-orange-500/20 rounded border border-orange-500/30">MUTABAKAT</span>
+                            </span>
+                            <span class="text-[11px] text-slate-400 block -mt-1">Buyback Geri Alım Portalı</span>
+                        </div>
+                    </a>
+
+                    <!-- Nav Linkleri -->
+                    <div class="hidden md:flex items-center space-x-1 pl-8">
+                        <a href="/dashboard" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'dashboard' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
+                            <i class="fa-solid fa-chart-line text-xs"></i>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="/mutabakat" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'mutabakat' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
+                            <i class="fa-solid fa-list-check text-xs"></i>
+                            <span>Mutabakat Listesi</span>
+                        </a>
+                        {% if current_user.role == 'admin' %}
+                        <a href="/import/daily" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'daily_upload' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
+                            <i class="fa-solid fa-cloud-arrow-up text-xs text-orange-400"></i>
+                            <span>Günlük Veri Yükle</span>
+                        </a>
+                        {% endif %}
+                        <a href="/export/excel" class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600/80 hover:bg-emerald-600 text-white transition flex items-center space-x-1.5 ml-2 shadow-sm">
+                            <i class="fa-solid fa-file-excel text-xs"></i>
+                            <span>Excel İndir</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Sağ Kullanıcı & Çıkış -->
+                <div class="flex items-center space-x-4">
+                    <div class="text-right hidden sm:block">
+                        <div class="text-xs font-bold leading-tight">{{ current_user.full_name }}</div>
+                        <div class="text-[10px] text-slate-400">
+                            {% if current_user.role == 'admin' %}
+                                <span class="text-amber-400"><i class="fa-solid fa-shield-halved mr-1"></i>Yönetici</span>
+                            {% else %}
+                                <span class="text-orange-400"><i class="fa-solid fa-user-check mr-1"></i>Operatör</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="/logout" class="bg-slate-700 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 border border-slate-600">
+                        <i class="fa-solid fa-right-from-bracket text-xs"></i>
+                        <span>Çıkış</span>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Flash Mesajı -->
+    {% if message %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 no-print w-full">
+        <div class="p-4 rounded-xl flex items-center space-x-3 {% if message_type == 'error' %}bg-rose-50 text-rose-800 border border-rose-200{% else %}bg-emerald-50 text-emerald-800 border border-emerald-200{% endif %}">
+            <i class="fa-solid {% if message_type == 'error' %}fa-circle-exclamation text-rose-500{% else %}fa-circle-check text-emerald-500{% endif %} text-base"></i>
+            <span class="text-xs font-semibold">{{ message }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Ana Gövde -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print mt-auto">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div>
+                © 2026 Teknosa Buyback Mutabakat Portalı — Otomatik Formül & Hakediş Motoru
+            </div>
+            <div class="flex items-center space-x-4 text-slate-400">
+                <span><i class="fa-solid fa-database mr-1"></i>SQLite (8,699+ Kayıt)</span>
+                <span><i class="fa-solid fa-bolt mr-1"></i>FastAPI & Python 3.13</span>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
