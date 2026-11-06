@@ -10,11 +10,15 @@
 
 
 
+
+
+
+
 <!-- cloude-code-toolbox:mcp-skills-awareness-begin -->
 
 ### MCP & Skills awareness (Claude Code ToolBox)
 
-_Last synced: 2026-11-03T12:22:00.016Z._
+_Last synced: 2026-11-05T07:10:07.983Z._
 
 - **Full report:** `.claude/cloude-code-toolbox-mcp-skills-awareness.md` in this workspace (auto-overwritten on each scan). Use it as ground truth for configured servers and skill folders.
 - **MCP:** For **live tools** in Claude Code, enable the matching server via `/mcp`. Servers are configured in `~/.claude.json` (user) and `.mcp.json` (project).
@@ -42,6 +46,11 @@ _None found (or no workspace open)._
 _None found._
 
 <!-- cloude-code-toolbox:mcp-skills-awareness-end -->
+
+
+
+
+
 <!-- cloude-code-toolbox:token-optimization-begin -->
 
 ### Token Optimization (Claude Code ToolBox)
@@ -57,6 +66,7 @@ _Active level: concise_
 - Do not read files matching `.claudeignore` patterns unless explicitly asked.
 
 <!-- cloude-code-toolbox:token-optimization-end -->
+
 <!-- claude-code-memory-bank:begin -->
 # Memory bank (persistent context)
 

@@ -12,3 +12,8 @@ env/
 venv/
 *.tmp
 temp/
+data/temp_uploads/
+*.xlsx
+data/personel_portal.db
+personel_portal/
+run_portal.py

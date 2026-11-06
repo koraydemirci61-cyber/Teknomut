@@ -102,10 +102,36 @@ def init_db():
         camera_original TEXT,
         battery_original TEXT,
         notes TEXT,
+        import_batch_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     """)
+
+    # İçe Aktarma Paketleri (Geri alma ve geçmiş takibi için)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS import_batches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_id TEXT UNIQUE NOT NULL,
+        filename TEXT NOT NULL,
+        file_size INTEGER DEFAULT 0,
+        total_rows INTEGER DEFAULT 0,
+        imported_count INTEGER DEFAULT 0,
+        skipped_count INTEGER DEFAULT 0,
+        updated_count INTEGER DEFAULT 0,
+        total_voucher REAL DEFAULT 0,
+        imported_by TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active', -- active, reverted
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reverted_at DATETIME
+    );
+    """)
+
+    # Mevcut tabloya gerekirse sütun ekle
+    cur.execute("PRAGMA table_info(mutabakat_records)")
+    existing_cols = [r["name"] for r in cur.fetchall()]
+    if "import_batch_id" not in existing_cols:
+        cur.execute("ALTER TABLE mutabakat_records ADD COLUMN import_batch_id TEXT;")
 
     cur.execute("CREATE INDEX IF NOT EXISTS idx_imei ON mutabakat_records(imei);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_store ON mutabakat_records(store_name);")
@@ -113,6 +139,29 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_customer ON mutabakat_records(customer_name);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_brand ON mutabakat_records(brand);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_model ON mutabakat_records(model);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_process_user ON mutabakat_records(process_user);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_process_date ON mutabakat_records(process_start_date);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_import_batch ON mutabakat_records(import_batch_id);")
+
+    # IMEI'si silinen / boş olan satırları veritabanından anında kalıcı olarak temizleme tetikleyicileri
+    cur.execute("""
+    CREATE TRIGGER IF NOT EXISTS trg_purge_empty_imei_insert AFTER INSERT ON mutabakat_records
+    WHEN NEW.imei IS NULL OR TRIM(NEW.imei) = '' OR LENGTH(TRIM(NEW.imei)) < 8
+    BEGIN
+        DELETE FROM mutabakat_records WHERE id = NEW.id;
+    END;
+    """)
+
+    cur.execute("""
+    CREATE TRIGGER IF NOT EXISTS trg_purge_empty_imei_update AFTER UPDATE ON mutabakat_records
+    WHEN NEW.imei IS NULL OR TRIM(NEW.imei) = '' OR LENGTH(TRIM(NEW.imei)) < 8
+    BEGIN
+        DELETE FROM mutabakat_records WHERE id = NEW.id;
+    END;
+    """)
+
+    # Başlangıçta olası boş/silinmiş IMEI kayıtlarını temizle
+    cur.execute("DELETE FROM mutabakat_records WHERE imei IS NULL OR TRIM(imei) = '' OR LENGTH(TRIM(imei)) < 8 OR imei = '0' OR imei = '-';")
 
     conn.commit()
     conn.close()

@@ -1,111 +1,412 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — Teknosa Mutabakat Portalı{% endblock %}
+{% block title %}Dashboard & Raporlama — Teknosa Mutabakat Portalı{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Başlık ve Aksiyonlar -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div>
-            <h1 class="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-                <span>Teknosa Mutabakat ve Hakediş Analitiği</span>
-                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">Canlı Sistem</span>
-            </h1>
-            <p class="text-xs text-slate-500 mt-1">Geri alım yapılan cihazların test soru puanları, tavan değerleri ve çek tutarı mutabakatları</p>
+    <!-- Yazdırma Anteti (Sadece Yazıcıda / PDF Çıktısında Görünür) -->
+    <div class="hidden print:block p-4 border-b-2 border-slate-900 mb-6">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-black text-slate-900">TEKNOSA MUTABAKAT VE HAKEDİŞ YÖNETİM RAPORU</h1>
+                <p class="text-xs text-slate-600 mt-0.5">Buyback Geri Alım Değerleme ve Çek Mutabakat Özeti</p>
+            </div>
+            <div class="text-right text-xs text-slate-600">
+                <div><strong>Rapor Tarihi:</strong> {{ today_str or '' }}</div>
+                <div><strong>Dönem:</strong> {{ period_label }}</div>
+            </div>
         </div>
-        <div class="flex items-center gap-2.5">
-            <a href="/export/excel" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
-                <i class="fa-solid fa-file-excel"></i>
-                <span>Excel Mutabakat İndir</span>
+        <div class="mt-2 text-xs text-slate-700 bg-slate-100 p-2 rounded flex flex-wrap gap-4">
+            <span><strong>Mağaza:</strong> {{ selected_store or 'Tüm Mağazalar' }}</span>
+            <span><strong>Temsilci:</strong> {{ selected_rep or 'Tüm Temsilciler' }}</span>
+            <span><strong>Model:</strong> {{ selected_model or 'Tüm Modeller' }}</span>
+            <span><strong>Statü:</strong> {{ selected_status or 'Tüm Statüler' }}</span>
+            <span><strong>Sıralama:</strong> {{ sort_label }}</span>
+        </div>
+    </div>
+
+    <!-- Üst Başlık & Aksiyon Çubuğu -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 no-print">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-xl font-extrabold text-slate-800 tracking-tight">Teknosa Mutabakat & Raporlama Merkezi</h1>
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5" title="Veritabanı canlı sorgulanmaktadır">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Canlı DB: {{ last_updated_time }}</span>
+                </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+                Adet, total tutar, model, mağaza ve temsilci bazında filtrelenebilir mutabakat ve hakediş analitiği
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Raporu Yenile / Senkronize Et -->
+            <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}&refresh=1" 
+               class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5"
+               title="Veritabanından en güncel verileri çek ve raporu yenile">
+                <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                <span>Raporu Yenile</span>
             </a>
+
+            <!-- Excel İndir (Seçili Filtrelerle) -->
+            <a href="/export/excel?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&status={{ selected_status }}" 
+               class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5"
+               title="Seçili filtredeki verileri Excel raporu olarak indir">
+                <i class="fa-solid fa-file-excel text-sm"></i>
+                <span>Excel Raporu İndir</span>
+            </a>
+
+            <!-- Yazdır / PDF Raporu -->
+            <button onclick="window.print()" 
+                    class="bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5"
+                    title="Bu raporu PDF veya yazıcı çıktısı olarak kaydet">
+                <i class="fa-solid fa-print text-sm"></i>
+                <span>Raporu Yazdır</span>
+            </button>
+
+            <!-- Kayıtlar Listesi -->
+            <a href="/mutabakat?store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}" 
+               class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-table-list text-sm"></i>
+                <span>Kayıtları Gör</span>
+            </a>
+
             {% if current_user.role == 'admin' %}
-            <a href="/import/daily" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
+            <a href="/import/daily" class="bg-orange-600 hover:bg-orange-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
                 <span>Günlük Veri Yükle</span>
             </a>
             {% endif %}
         </div>
     </div>
 
-    <!-- KPI Sayaç Kartları -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <!-- Toplam İşlem -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3.5">
-            <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-boxes-stacked"></i>
+    <!-- Yenileme Bildirimi (Varsa) -->
+    {% if is_refreshed %}
+    <div class="p-3 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm no-print">
+        <i class="fa-solid fa-circle-check text-blue-600 text-sm"></i>
+        <span>Rapor veritabanından başarıyla yenilendi (Saat: {{ last_updated_time }}). Tüm canlı veriler ve metrikler güncellendi.</span>
+    </div>
+    {% endif %}
+
+            {% if current_user.role == 'admin' %}
+            <a href="/import/daily" class="bg-orange-600 hover:bg-orange-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                <span>Günlük Veri Yükle</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Gelişmiş Filtreleme & Dönem Seçim Paneli -->
+    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 no-print">
+        
+        <!-- Üst Satır: Hızlı Dönem Butonları (Haftalık, Aylık, 3 Aylık) & Sıralama -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <i class="fa-solid fa-clock-rotate-left text-orange-500"></i>
+                    <span>Raporlama Dönemi:</span>
+                </span>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono">
+                    {{ period_label }}
+                </span>
             </div>
-            <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam İşlem</span>
-                <div class="text-xl font-extrabold text-slate-900 font-mono">{{ "{:,}".format(stats.total) }}</div>
-                <span class="text-[10px] text-slate-500">Adet Cihaz</span>
+
+            <!-- Hızlı Dönem Seçicileri -->
+            <div class="inline-flex rounded-xl shadow-sm bg-slate-100 p-1 flex-wrap gap-1">
+                <a href="/dashboard?period=all&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" 
+                   class="px-3 py-1.5 text-xs font-bold rounded-lg transition {% if selected_period == 'all' %}bg-white text-orange-600 shadow-sm border border-slate-200{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Tüm Zamanlar
+                </a>
+                <a href="/dashboard?period=7d&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" 
+                   class="px-3 py-1.5 text-xs font-bold rounded-lg transition {% if selected_period == '7d' %}bg-white text-orange-600 shadow-sm border border-slate-200{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Haftalık (Son 7 Gün)
+                </a>
+                <a href="/dashboard?period=30d&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" 
+                   class="px-3 py-1.5 text-xs font-bold rounded-lg transition {% if selected_period == '30d' %}bg-white text-orange-600 shadow-sm border border-slate-200{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Aylık (Son 30 Gün)
+                </a>
+                <a href="/dashboard?period=90d&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" 
+                   class="px-3 py-1.5 text-xs font-bold rounded-lg transition {% if selected_period == '90d' %}bg-white text-orange-600 shadow-sm border border-slate-200{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    3 Aylık (Son 90 Gün)
+                </a>
             </div>
         </div>
 
-        <!-- Toplam Çek Tutarı -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3.5">
-            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-money-check-dollar"></i>
-            </div>
+        <!-- Alt Satır: Ayrıntılı Filtre Formu (Mağaza, Temsilci, Model, Sıralama, Tarih Aralığı) -->
+        <form method="get" action="/dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+            <input type="hidden" name="period" value="{% if start_date or end_date %}custom{% else %}{{ selected_period }}{% endif %}">
+
+            <!-- Mağaza Seçimi -->
             <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Verilen Çek Tutarı</span>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                    <span><i class="fa-solid fa-store text-slate-400 mr-1"></i> Mağaza</span>
+                    {% if selected_store %}
+                    <span class="text-[10px] text-orange-600 font-normal">Aktif</span>
+                    {% endif %}
+                </label>
+                <select name="store" id="storeSelect" onchange="this.form.submit()" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-2.5 py-2 text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                    <option value="">Tüm Mağazalar (145)</option>
+                    {% for st in all_stores %}
+                    <option value="{{ st.store_name }}" {% if selected_store == st.store_name %}selected{% endif %}>
+                        {{ st.store_name }} ({{ st.c }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Mağaza Temsilcisi Seçimi -->
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                    <span><i class="fa-solid fa-user-tie text-slate-400 mr-1"></i> Temsilci</span>
+                    {% if selected_rep %}
+                    <span class="text-[10px] text-orange-600 font-normal">Aktif</span>
+                    {% endif %}
+                </label>
+                <select name="rep" id="repSelect" onchange="this.form.submit()" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-2.5 py-2 text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                    <option value="">Tüm Temsilciler</option>
+                    {% for r in all_reps %}
+                    <option value="{{ r.process_user }}" {% if selected_rep == r.process_user %}selected{% endif %}>
+                        {{ r.process_user }} {% if r.store_name and not selected_store %}({{ r.store_name[:12] }}..){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Model Seçimi -->
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                    <span><i class="fa-solid fa-mobile-screen text-slate-400 mr-1"></i> Cihaz Modeli</span>
+                    {% if selected_model %}
+                    <span class="text-[10px] text-orange-600 font-normal">Aktif</span>
+                    {% endif %}
+                </label>
+                <select name="model" id="modelSelect" onchange="this.form.submit()" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-2.5 py-2 text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                    <option value="">Tüm Modeller</option>
+                    {% for m in all_models %}
+                    <option value="{{ m.model }}" {% if selected_model == m.model %}selected{% endif %}>
+                        {{ m.model }} ({{ m.c }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Sıralama / Raporlama Ölçütü (Adet, Total Tutar, Fark) -->
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">
+                    <i class="fa-solid fa-arrow-down-wide-short text-slate-400 mr-1"></i> Sıralama Ölçütü
+                </label>
+                <select name="sort_by" onchange="this.form.submit()" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-2.5 py-2 text-xs font-semibold focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                    <option value="count" {% if sort_by == 'count' %}selected{% endif %}>📊 İşlem Adedine Göre</option>
+                    <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>💰 Total Tutara Göre (₺)</option>
+                    <option value="diff" {% if sort_by == 'diff' %}selected{% endif %}>⚖️ Fark Tutarına Göre (₺)</option>
+                </select>
+            </div>
+
+            <!-- Özel Başlangıç & Bitiş Tarihi -->
+            <div class="grid grid-cols-2 gap-1.5">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Başlangıç</label>
+                    <input type="date" name="start_date" value="{{ start_date }}" 
+                           class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Bitiş</label>
+                    <input type="date" name="end_date" value="{{ end_date }}" 
+                           class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 focus:bg-white transition">
+                </div>
+            </div>
+
+            <!-- Filtre Butonları -->
+            <div class="flex items-center space-x-2">
+                <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 px-3 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Raporla</span>
+                </button>
+                <a href="/dashboard" class="bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 px-3 rounded-xl text-xs font-bold transition" title="Filtreleri Sıfırla">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </a>
+            </div>
+        </form>
+
+        <!-- Aktif Filtre Rozetleri (Varsa) -->
+        {% if selected_store or selected_rep or selected_model or selected_period != 'all' or start_date or end_date %}
+        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+            <span class="text-slate-400 text-[11px] font-semibold">Uygulanan Filtreler:</span>
+            
+            {% if selected_period != 'all' %}
+            <span class="inline-flex items-center bg-orange-50 text-orange-800 px-2.5 py-1 rounded-lg text-xs font-medium border border-orange-200">
+                <i class="fa-regular fa-clock mr-1.5 text-orange-500"></i>
+                <span>{{ period_label }}</span>
+                <a href="/dashboard?period=all&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" class="ml-1.5 text-orange-500 hover:text-orange-800"><i class="fa-solid fa-xmark"></i></a>
+            </span>
+            {% endif %}
+
+            {% if selected_store %}
+            <span class="inline-flex items-center bg-blue-50 text-blue-800 px-2.5 py-1 rounded-lg text-xs font-medium border border-blue-200">
+                <i class="fa-solid fa-store mr-1.5 text-blue-500"></i>
+                <span>{{ selected_store }}</span>
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" class="ml-1.5 text-blue-500 hover:text-blue-800"><i class="fa-solid fa-xmark"></i></a>
+            </span>
+            {% endif %}
+
+            {% if selected_rep %}
+            <span class="inline-flex items-center bg-purple-50 text-purple-800 px-2.5 py-1 rounded-lg text-xs font-medium border border-purple-200">
+                <i class="fa-solid fa-user-tie mr-1.5 text-purple-500"></i>
+                <span>{{ selected_rep }}</span>
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&model={{ selected_model }}&sort_by={{ sort_by }}" class="ml-1.5 text-purple-500 hover:text-purple-800"><i class="fa-solid fa-xmark"></i></a>
+            </span>
+            {% endif %}
+
+            {% if selected_model %}
+            <span class="inline-flex items-center bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg text-xs font-medium border border-emerald-200">
+                <i class="fa-solid fa-mobile-screen mr-1.5 text-emerald-500"></i>
+                <span>{{ selected_model }}</span>
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&sort_by={{ sort_by }}" class="ml-1.5 text-emerald-500 hover:text-emerald-800"><i class="fa-solid fa-xmark"></i></a>
+            </span>
+            {% endif %}
+
+            <a href="/dashboard" class="text-xs text-rose-600 hover:underline font-semibold ml-2">Tüm Filtreleri Temizle</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- KPI Sayaç Kartları (6 Kartlık Genişletilmiş Görünüm) -->
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3.5">
+        
+        <!-- 1. Toplam İşlem -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Toplam İşlem</span>
+                <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="text-xl font-extrabold text-slate-900 font-mono">{{ "{:,}".format(stats.total) }}</div>
+                <span class="text-[10px] text-slate-500">Adet Cihaz Girişi</span>
+            </div>
+        </div>
+
+        <!-- 2. Verilen Çek Tutarı -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Çek</span>
+                <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-money-check-dollar"></i>
+                </div>
+            </div>
+            <div class="mt-2">
                 <div class="text-lg font-extrabold text-slate-900 font-mono">{{ "{:,.0f}".format(stats.total_voucher) }} ₺</div>
                 <span class="text-[10px] text-slate-500">Müşteriye Ödenen</span>
             </div>
         </div>
 
-        <!-- Toplam Hakediş Değeri -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3.5">
-            <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-calculator"></i>
+        <!-- 3. Hesaplanan Hakediş -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hakediş Değeri</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-calculator"></i>
+                </div>
             </div>
-            <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hesaplanan Hakediş</span>
+            <div class="mt-2">
                 <div class="text-lg font-extrabold text-emerald-700 font-mono">{{ "{:,.0f}".format(stats.total_calculated) }} ₺</div>
-                <span class="text-[10px] text-slate-500">Puan Düşülmüş Değer</span>
+                <span class="text-[10px] text-slate-500">Hesaplanan Tutar</span>
             </div>
         </div>
 
-        <!-- Toplam Fark Tutarı -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3.5">
-            <div class="w-11 h-11 rounded-xl {% if stats.total_diff < 0 %}bg-rose-50 text-rose-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-scale-unbalanced"></i>
+        <!-- 4. Toplam Net Fark (SADECE MUTABAKATI TAMAMLANANLAR İÇİN) -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Net Fark</span>
+                    <span class="text-[9px] text-emerald-600 font-bold block">(Tamamlananlar)</span>
+                </div>
+                <div class="w-8 h-8 rounded-lg {% if stats.total_diff < 0 %}bg-rose-50 text-rose-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-scale-unbalanced"></i>
+                </div>
             </div>
-            <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam Fark</span>
+            <div class="mt-2">
                 <div class="text-lg font-extrabold {% if stats.total_diff < 0 %}text-rose-600{% else %}text-emerald-600{% endif %} font-mono">
                     {{ "{:,.0f}".format(stats.total_diff) }} ₺
                 </div>
-                <span class="text-[10px] text-slate-500">Hakediş - Çek Tutarı</span>
+                <span class="text-[10px] text-slate-500">Hakediş − Çek (Sonuçlanan)</span>
             </div>
         </div>
 
-        <!-- Tamamlanan Oranı -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-3.5">
-            <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg shrink-0">
-                <i class="fa-solid fa-circle-check"></i>
+        <!-- 5. Mutabakat Tamamlanma -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tamamlanan</span>
+                <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
             </div>
-            <div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Mutabakat Tamam</span>
-                <div class="text-xl font-extrabold text-purple-700 font-mono">{{ "{:,}".format(stats.completed_count) }}</div>
+            <div class="mt-2">
+                <div class="text-lg font-extrabold text-purple-700 font-mono">{{ "{:,}".format(stats.completed_count) }}</div>
                 <span class="text-[10px] text-slate-500">%{{ stats.completed_pct }} Tamamlandı</span>
             </div>
         </div>
+
+        <!-- 6. Uyuşmazlık / Fark Oranı (SADECE MUTABAKATI TAMAMLANANLAR İÇİNDE) -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Uyuşmazlık</span>
+                    <span class="text-[9px] text-rose-600 font-bold block">(Tamamlananlar)</span>
+                </div>
+                <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="text-lg font-extrabold text-rose-600 font-mono">{{ "{:,}".format(stats.diff_count) }}</div>
+                <span class="text-[10px] text-slate-500">%{{ stats.diff_pct }} Tamamlanan İçi</span>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Grafikler Satırı -->
+    <!-- Grafikler 1. Satır: Zaman Serisi Trendi & Statü Dağılımı -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- 1. Pasta: Mutabakat Statü Dağılımı -->
+        
+        <!-- Zaman Serisi Trend Grafiği (Geniş - 2 Kolon) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <span>İşlem Hacmi & Hakediş Zaman Trendi</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-normal">
+                            {% if is_daily %}Günlük Dağılım{% else %}Aylık Dağılım{% endif %}
+                        </span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Seçili dönemde gerçekleşen geri alım adetleri ve hakediş değerleri</p>
+                </div>
+                <div class="flex items-center space-x-3 text-xs text-slate-500">
+                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 mr-1.5"></span> Cihaz Adedi</span>
+                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-1.5"></span> Verilen Çek</span>
+                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></span> Hakediş</span>
+                </div>
+            </div>
+            <div class="relative h-72">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Statü Dağılımı (1 Kolon) -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 class="font-bold text-slate-800 text-sm mb-1 flex items-center justify-between">
                 <span>Mutabakat Statü Dağılımı</span>
                 <i class="fa-solid fa-chart-pie text-slate-400"></i>
             </h3>
-            <p class="text-xs text-slate-500 mb-4">İşlemlerin tamamlanma ve bekleme durumları</p>
-            <div class="relative h-60 flex items-center justify-center">
+            <p class="text-xs text-slate-500 mb-3">Tamamlanan, cevap bekleyen ve iptal durumlar</p>
+            <div class="relative h-56 flex items-center justify-center">
                 <canvas id="statusChart"></canvas>
             </div>
-            <div class="mt-4 space-y-1.5 text-xs">
+            <div class="mt-3 space-y-2 text-xs">
                 {% for st in stats.status_counts %}
                 <div class="flex justify-between items-center text-slate-600">
                     <span class="flex items-center">
@@ -118,84 +419,438 @@
             </div>
         </div>
 
-        <!-- 2. Bar: Marka Bazında Geri Alım Dağılımı -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
+    </div>
+
+    <!-- Grafikler 2. Satır: Marka Dağılımı & Dinamik Performans Dağılımı -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Marka Bazında Geri Alım Dağılımı -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 class="font-bold text-slate-800 text-sm mb-1 flex items-center justify-between">
                 <span>En Çok Geri Alınan Cihaz Markaları</span>
                 <i class="fa-solid fa-chart-bar text-slate-400"></i>
             </h3>
-            <p class="text-xs text-slate-500 mb-4">Marka bazında işlem adetleri</p>
+            <p class="text-xs text-slate-500 mb-4">Marka bazında işlem adetleri ve işlem yoğunluğu</p>
             <div class="relative h-64">
                 <canvas id="brandChart"></canvas>
             </div>
         </div>
+
+        <!-- Dinamik Performans Grafiği (Mağaza / Temsilci / Model) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-800 text-sm mb-1 flex items-center justify-between">
+                <span id="perfChartTitle">
+                    {% if selected_store %}
+                    {{ selected_store }} — Temsilci Dağılımı
+                    {% elif selected_model %}
+                    {{ selected_model }} — Mağaza Dağılımı
+                    {% else %}
+                    Top Dağılım ({{ sort_label }})
+                    {% endif %}
+                </span>
+                <i class="fa-solid fa-chart-simple text-slate-400"></i>
+            </h3>
+            <p class="text-xs text-slate-500 mb-4">
+                {% if sort_by == 'amount' %}
+                Total verilen çek tutarı en yüksek olan kayıtlar
+                {% elif sort_by == 'diff' %}
+                Tamamlanan mutabakatlarda net farkı en yüksek olan kayıtlar
+                {% else %}
+                İşlem adedi en yüksek olan ilk 7 kayıt
+                {% endif %}
+            </p>
+            <div class="relative h-64">
+                <canvas id="perfChart"></canvas>
+            </div>
+        </div>
+
     </div>
 
-    <!-- En Çok Fark (Uyuşmazlık) Çıkan İşlemler -->
+    <!-- Çok Boyutlu Raporlama Merkezi: Mağaza, Temsilci, Model Sekmeleri -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        
+        <!-- Sekme Başlıkları ve Sıralama Butonları -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <!-- Sekmeler -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="switchTab('store')" id="tabBtn-store" 
+                        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-orange-600 text-white shadow-sm">
+                    <i class="fa-solid fa-store"></i>
+                    <span>Mağaza Bazlı Rapor</span>
+                </button>
+                <button onclick="switchTab('rep')" id="tabBtn-rep" 
+                        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:text-slate-900">
+                    <i class="fa-solid fa-user-tie"></i>
+                    <span>Temsilci Bazlı Rapor</span>
+                </button>
+                <button onclick="switchTab('model')" id="tabBtn-model" 
+                        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:text-slate-900">
+                    <i class="fa-solid fa-mobile-screen"></i>
+                    <span>Model Bazlı Rapor</span>
+                </button>
+            </div>
+
+            <!-- Sıralama Ölçütü -->
+            <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs">
+                <span class="text-[10px] font-bold text-slate-400 px-2 uppercase">Ölçüt:</span>
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by=count" 
+                   class="px-2.5 py-1 rounded-lg font-bold transition {% if sort_by == 'count' %}bg-white text-orange-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Adete Göre
+                </a>
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by=amount" 
+                   class="px-2.5 py-1 rounded-lg font-bold transition {% if sort_by == 'amount' %}bg-white text-orange-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Total Tutar
+                </a>
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by=diff" 
+                   class="px-2.5 py-1 rounded-lg font-bold transition {% if sort_by == 'diff' %}bg-white text-orange-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                    Net Fark
+                </a>
+            </div>
+        </div>
+
+        <!-- 1. SEKME: MAĞAZA PERFORMANS TABLOSU -->
+        <div id="tabContent-store">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs text-slate-500">
+                    {% if selected_store %}
+                    <strong>{{ selected_store }}</strong> mağazası performans dökümü
+                    {% else %}
+                    Teknosa Mağazaları (Sütun başlıklarına tıklayarak büyükten küçüğe / küçükten büyüğe sıralayabilirsiniz)
+                    {% endif %}
+                </p>
+                {% if selected_store %}
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" class="text-xs text-orange-600 hover:underline font-bold">
+                    Tüm Mağazalara Dön
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="overflow-x-auto">
+                <table id="storeTable" class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                            <th onclick="sortTable('storeTable', 0, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Mağaza adına göre sırala">
+                                <span>Mağaza Adı</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('storeTable', 1, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="İşlem adedine göre sırala">
+                                <span>İşlem Adedi</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('storeTable', 2, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Total çek tutarına göre sırala">
+                                <span>Total Çek (₺)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('storeTable', 3, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Hakedişe göre sırala">
+                                <span>Hakediş (₺)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('storeTable', 4, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Net farka göre sırala">
+                                <span>Net Fark (Tamamlanan)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('storeTable', 5, true)" class="py-2.5 px-2 text-center font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Tamamlanan adede göre sırala">
+                                <span>Tamamlanan</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th class="py-2.5 px-2 text-center no-print">Filtrele</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for st in store_performance %}
+                        <tr class="hover:bg-slate-50/80 transition {% if selected_store == st.store_name %}bg-orange-50/60 font-semibold{% endif %}">
+                            <td class="py-2.5 px-3" data-value="{{ st.store_name }}">
+                                <div class="font-semibold text-slate-800 truncate max-w-[220px]" title="{{ st.store_name }}">
+                                    {{ st.store_name }}
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-2 text-right font-mono font-bold text-slate-700" data-value="{{ st.total }}">{{ "{:,}".format(st.total) }}</td>
+                            <td class="py-2.5 px-2 text-right font-mono font-semibold text-slate-800" data-value="{{ st.total_voucher }}">{{ "{:,.0f}".format(st.total_voucher) }} ₺</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-emerald-700" data-value="{{ st.total_calculated }}">{{ "{:,.0f}".format(st.total_calculated) }} ₺</td>
+                            <td class="py-2.5 px-2 text-right font-mono font-bold {% if st.total_diff < 0 %}text-rose-600{% else %}text-emerald-600{% endif %}" data-value="{{ st.total_diff }}">
+                                {{ "{:,.0f}".format(st.total_diff) }} ₺
+                            </td>
+                            <td class="py-2.5 px-2 text-center" data-value="{{ st.completed_count }}">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-50 text-purple-700 border border-purple-200 font-mono">
+                                    {{ st.completed_count }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-2 text-center no-print">
+                                <a href="/dashboard?store={{ st.store_name }}&period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&rep={{ selected_rep }}&model={{ selected_model }}&sort_by={{ sort_by }}" 
+                                   class="text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-blue-200"
+                                   title="Bu mağazayı seç">
+                                    Seç
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 2. SEKME: TEMSİLCİ PERFORMANS TABLOSU -->
+        <div id="tabContent-rep" class="hidden">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs text-slate-500">
+                    {% if selected_store %}
+                    <strong>{{ selected_store }}</strong> bünyesinde işlem yapan temsilciler
+                    {% else %}
+                    Mağaza Temsilcileri (Sütun başlıklarına tıklayarak büyükten küçüğe / küçükten büyüğe sıralayabilirsiniz)
+                    {% endif %}
+                </p>
+                {% if selected_rep %}
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&model={{ selected_model }}&sort_by={{ sort_by }}" class="text-xs text-orange-600 hover:underline font-bold">
+                    Temsilci Filtresini Kaldır
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="overflow-x-auto">
+                <table id="repTable" class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                            <th onclick="sortTable('repTable', 0, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Temsilci adına göre sırala">
+                                <span>Temsilci (İşlemi Yapan)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('repTable', 1, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Mağaza adına göre sırala">
+                                <span>Bağlı Mağaza</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('repTable', 2, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="İşlem adedine göre sırala">
+                                <span>İşlem Adedi</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('repTable', 3, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Total çek tutarına göre sırala">
+                                <span>Total Çek (₺)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('repTable', 4, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Hakedişe göre sırala">
+                                <span>Hakediş (₺)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('repTable', 5, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Net farka göre sırala">
+                                <span>Net Fark (Tamamlanan)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('repTable', 6, true)" class="py-2.5 px-2 text-center font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Tamamlanan adede göre sırala">
+                                <span>Tamamlanan</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th class="py-2.5 px-2 text-center no-print">Filtrele</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for rp in rep_performance %}
+                        <tr class="hover:bg-slate-50/80 transition {% if selected_rep == rp.process_user %}bg-purple-50/60 font-semibold{% endif %}">
+                            <td class="py-2.5 px-3" data-value="{{ rp.process_user }}">
+                                <div class="font-semibold text-slate-800 truncate max-w-[180px]" title="{{ rp.process_user }}">
+                                    {{ rp.process_user }}
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3" data-value="{{ rp.store_name }}">
+                                <div class="text-[11px] text-slate-600 truncate max-w-[200px]" title="{{ rp.store_name }}">
+                                    {{ rp.store_name }}
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-2 text-right font-mono font-bold text-slate-700" data-value="{{ rp.total }}">{{ "{:,}".format(rp.total) }}</td>
+                            <td class="py-2.5 px-2 text-right font-mono font-semibold text-slate-800" data-value="{{ rp.total_voucher }}">{{ "{:,.0f}".format(rp.total_voucher) }} ₺</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-emerald-700" data-value="{{ rp.total_calculated }}">{{ "{:,.0f}".format(rp.total_calculated) }} ₺</td>
+                            <td class="py-2.5 px-2 text-right font-mono font-bold {% if rp.total_diff < 0 %}text-rose-600{% else %}text-emerald-600{% endif %}" data-value="{{ rp.total_diff }}">
+                                {{ "{:,.0f}".format(rp.total_diff) }} ₺
+                            </td>
+                            <td class="py-2.5 px-2 text-center" data-value="{{ rp.completed_count }}">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-50 text-purple-700 border border-purple-200 font-mono">
+                                    {{ rp.completed_count }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-2 text-center no-print">
+                                <a href="/dashboard?rep={{ rp.process_user }}&store={{ rp.store_name }}&period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&model={{ selected_model }}&sort_by={{ sort_by }}" 
+                                   class="text-purple-600 hover:bg-purple-50 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-purple-200"
+                                   title="Bu temsilciyi seç">
+                                    Seç
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3. SEKME: MODEL PERFORMANS TABLOSU -->
+        <div id="tabContent-model" class="hidden">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs text-slate-500">
+                    Cihaz Modelleri (Sütun başlıklarına tıklayarak büyükten küçüğe / küçükten büyüğe sıralayabilirsiniz)
+                </p>
+                {% if selected_model %}
+                <a href="/dashboard?period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&sort_by={{ sort_by }}" class="text-xs text-orange-600 hover:underline font-bold">
+                    Model Filtresini Kaldır
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="overflow-x-auto">
+                <table id="modelTable" class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                            <th onclick="sortTable('modelTable', 0, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Cihaz modeline göre sırala">
+                                <span>Cihaz Modeli</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('modelTable', 1, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Markaya göre sırala">
+                                <span>Marka</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('modelTable', 2, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="İşlem adedine göre sırala">
+                                <span>İşlem Adedi</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('modelTable', 3, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Total çek tutarına göre sırala">
+                                <span>Total Çek (₺)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('modelTable', 4, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Hakedişe göre sırala">
+                                <span>Hakediş (₺)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('modelTable', 5, true)" class="py-2.5 px-2 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Net farka göre sırala">
+                                <span>Net Fark (Tamamlanan)</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th onclick="sortTable('modelTable', 6, true)" class="py-2.5 px-2 text-center font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Tamamlanan adede göre sırala">
+                                <span>Tamamlanan</span>
+                                <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                            </th>
+                            <th class="py-2.5 px-2 text-center no-print">Filtrele</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for md in model_performance %}
+                        <tr class="hover:bg-slate-50/80 transition {% if selected_model == md.model %}bg-emerald-50/60 font-semibold{% endif %}">
+                            <td class="py-2.5 px-3" data-value="{{ md.model }}">
+                                <div class="font-semibold text-slate-800 truncate max-w-[220px]" title="{{ md.model }}">
+                                    {{ md.model }}
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3" data-value="{{ md.brand }}">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                                    {{ md.brand }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-2 text-right font-mono font-bold text-slate-700" data-value="{{ md.total }}">{{ "{:,}".format(md.total) }}</td>
+                            <td class="py-2.5 px-2 text-right font-mono font-semibold text-slate-800" data-value="{{ md.total_voucher }}">{{ "{:,.0f}".format(md.total_voucher) }} ₺</td>
+                            <td class="py-2.5 px-2 text-right font-mono text-emerald-700" data-value="{{ md.total_calculated }}">{{ "{:,.0f}".format(md.total_calculated) }} ₺</td>
+                            <td class="py-2.5 px-2 text-right font-mono font-bold {% if md.total_diff < 0 %}text-rose-600{% else %}text-emerald-600{% endif %}" data-value="{{ md.total_diff }}">
+                                {{ "{:,.0f}".format(md.total_diff) }} ₺
+                            </td>
+                            <td class="py-2.5 px-2 text-center" data-value="{{ md.completed_count }}">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-50 text-purple-700 border border-purple-200 font-mono">
+                                    {{ md.completed_count }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-2 text-center no-print">
+                                <a href="/dashboard?model={{ md.model }}&period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}&store={{ selected_store }}&rep={{ selected_rep }}&sort_by={{ sort_by }}" 
+                                   class="text-emerald-600 hover:bg-emerald-50 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-emerald-200"
+                                   title="Bu modeli seç">
+                                    Seç
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- En Çok Fark (Uyuşmazlık) Çıkan İşlemler (SADECE MUTABAKATI TAMAMLANANLAR) -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h3 class="font-bold text-slate-800 text-sm">Dikkat Gerektiren Fark / Uyuşmazlık Kayıtları</h3>
-                <p class="text-xs text-slate-500">Çek tutarı ile hesaplanan hakediş arasında en yüksek fark oluşan cihazlar</p>
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <span>Dikkat Gerektiren Uyuşmazlık Kayıtları (Mutabakatı Tamamlananlar)</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 font-semibold">
+                        Sonuçlanan Kritik Farklar
+                    </span>
+                </h3>
+                <p class="text-xs text-slate-500">Mutabakatı tamamlandığı halde verilen çek tutarı ile hakediş arasında fark oluşan cihazlar</p>
             </div>
-            <a href="/mutabakat?has_diff=yes" class="text-orange-600 hover:text-orange-700 text-xs font-bold flex items-center space-x-1">
-                <span>Farkı Olanları Listele</span>
+            <a href="/mutabakat?has_diff=yes&status=Mutabakat+tamamlandı&store={{ selected_store }}&rep={{ selected_rep }}&model={{ selected_model }}&period={{ selected_period }}&start_date={{ start_date }}&end_date={{ end_date }}" 
+               class="text-orange-600 hover:text-orange-700 text-xs font-bold flex items-center space-x-1 no-print">
+                <span>Tüm Tamamlanan Farklı Kayıtları Gör</span>
                 <i class="fa-solid fa-arrow-right"></i>
             </a>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table id="topDiffTable" class="w-full text-left text-xs">
                 <thead>
                     <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px]">
-                        <th class="py-2.5 px-3">IMEI</th>
-                        <th class="py-2.5 px-3">Müşteri</th>
-                        <th class="py-2.5 px-3">Marka / Model</th>
-                        <th class="py-2.5 px-3">Mağaza</th>
-                        <th class="py-2.5 px-3 text-right">Verilen Çek</th>
-                        <th class="py-2.5 px-3 text-right">Hesaplanan Değer</th>
-                        <th class="py-2.5 px-3 text-right font-bold">Fark</th>
+                        <th onclick="sortTable('topDiffTable', 0, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="IMEI'ye göre sırala">
+                            <span>IMEI</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
+                        <th onclick="sortTable('topDiffTable', 1, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Müşteri adına göre sırala">
+                            <span>Müşteri</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
+                        <th onclick="sortTable('topDiffTable', 2, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Modele göre sırala">
+                            <span>Marka / Model</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
+                        <th onclick="sortTable('topDiffTable', 3, false)" class="py-2.5 px-3 cursor-pointer hover:bg-slate-100 select-none group" title="Mağazaya göre sırala">
+                            <span>Mağaza / Temsilci</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
+                        <th onclick="sortTable('topDiffTable', 4, true)" class="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-100 select-none group" title="Verilen çeke göre sırala">
+                            <span>Verilen Çek</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
+                        <th onclick="sortTable('topDiffTable', 5, true)" class="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-100 select-none group" title="Hesaplanan değere göre sırala">
+                            <span>Hesaplanan Değer</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
+                        <th onclick="sortTable('topDiffTable', 6, true)" class="py-2.5 px-3 text-right font-bold cursor-pointer hover:bg-slate-100 select-none group" title="Net farka göre sırala">
+                            <span>Net Fark</span> <i class="fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1"></i>
+                        </th>
                         <th class="py-2.5 px-3 text-center">Statü</th>
-                        <th class="py-2.5 px-3 text-right">İşlem</th>
+                        <th class="py-2.5 px-3 text-right no-print">İşlem</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     {% for r in top_diff_records %}
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="py-2.5 px-3 font-mono font-bold text-slate-800">{{ r.imei }}</td>
-                        <td class="py-2.5 px-3 font-medium text-slate-700">{{ r.customer_name }}</td>
-                        <td class="py-2.5 px-3">
+                        <td class="py-2.5 px-3 font-mono font-bold text-slate-800" data-value="{{ r.imei }}">{{ r.imei }}</td>
+                        <td class="py-2.5 px-3 font-medium text-slate-700" data-value="{{ r.customer_name }}">{{ r.customer_name }}</td>
+                        <td class="py-2.5 px-3" data-value="{{ r.model }}">
                             <span class="font-semibold text-slate-800 block">{{ r.model }}</span>
                             <span class="text-[10px] text-slate-400">{{ r.brand }}</span>
                         </td>
-                        <td class="py-2.5 px-3 text-slate-600 truncate max-w-[150px]">{{ r.store_name }}</td>
-                        <td class="py-2.5 px-3 text-right font-mono">{{ "{:,.2f}".format(r.voucher_amount) }} ₺</td>
-                        <td class="py-2.5 px-3 text-right font-mono text-emerald-700">{{ "{:,.2f}".format(r.calculated_price) }} ₺</td>
-                        <td class="py-2.5 px-3 text-right font-mono font-bold {% if r.difference_amount < 0 %}text-rose-600{% else %}text-emerald-600{% endif %}">
+                        <td class="py-2.5 px-3 text-slate-600" data-value="{{ r.store_name }}">
+                            <span class="font-medium text-slate-800 block truncate max-w-[160px]">{{ r.store_name }}</span>
+                            <span class="text-[10px] text-slate-400 block truncate max-w-[160px]">{{ r.process_user }}</span>
+                        </td>
+                        <td class="py-2.5 px-3 text-right font-mono" data-value="{{ r.voucher_amount }}">{{ "{:,.2f}".format(r.voucher_amount) }} ₺</td>
+                        <td class="py-2.5 px-3 text-right font-mono text-emerald-700" data-value="{{ r.calculated_price }}">{{ "{:,.2f}".format(r.calculated_price) }} ₺</td>
+                        <td class="py-2.5 px-3 text-right font-mono font-bold {% if r.difference_amount < 0 %}text-rose-600{% else %}text-emerald-600{% endif %}" data-value="{{ r.difference_amount }}">
                             {{ "{:,.2f}".format(r.difference_amount) }} ₺
                         </td>
                         <td class="py-2.5 px-3 text-center">
-                            {% if r.reconciliation_status == 'Mutabakat tamamlandı' %}
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 Mutabakat tamamlandı
                             </span>
-                            {% elif r.reconciliation_status == 'İptal' %}
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                                İptal
-                            </span>
-                            {% else %}
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                {{ r.reconciliation_status or 'Cevap bekleniyor' }}
-                            </span>
-                            {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 text-right space-x-1">
+                        <td class="py-2.5 px-3 text-right space-x-1 no-print">
                             <a href="/mutabakat/{{ r.id }}" class="text-orange-600 hover:bg-orange-50 p-1.5 rounded-lg" title="Detay & Fiş">
                                 <i class="fa-solid fa-file-invoice text-xs"></i>
                             </a>
                             <a href="/mutabakat/{{ r.id }}/edit" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg" title="Puanları Düzenle">
                                 <i class="fa-solid fa-pen-to-square text-xs"></i>
                             </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="p-6 text-center text-slate-400">
+                            Seçili filtrede tamamlanmış uyuşmazlık kaydı bulunmuyor.
                         </td>
                     </tr>
                     {% endfor %}
@@ -207,7 +862,109 @@
 </div>
 
 <script>
-    // 1. Statü Grafiği
+    // SEKME GEÇİŞİ FONKSİYONU
+    function switchTab(tabName) {
+        ['store', 'rep', 'model'].forEach(t => {
+            const btn = document.getElementById('tabBtn-' + t);
+            const content = document.getElementById('tabContent-' + t);
+            if (t === tabName) {
+                btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-orange-600 text-white shadow-sm';
+                content.classList.remove('hidden');
+            } else {
+                btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:text-slate-900';
+                content.classList.add('hidden');
+            }
+        });
+    }
+
+    // 1. ZAMAN SERİSİ TREND GRAFİĞİ (Line & Bar)
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    const trendLabels = [{% for tr in trend_rows %}'{{ tr.label }}',{% endfor %}];
+    const trendCounts = [{% for tr in trend_rows %}{{ tr.count }},{% endfor %}];
+    const trendVouchers = [{% for tr in trend_rows %}{{ tr.voucher }},{% endfor %}];
+    const trendCalcs = [{% for tr in trend_rows %}{{ tr.calculated }},{% endfor %}];
+
+    new Chart(trendCtx, {
+        type: 'bar',
+        data: {
+            labels: trendLabels,
+            datasets: [
+                {
+                    label: 'İşlem Adedi',
+                    type: 'bar',
+                    data: trendCounts,
+                    backgroundColor: 'rgba(59, 130, 246, 0.4)',
+                    borderColor: '#3b82f6',
+                    borderWidth: 1.5,
+                    borderRadius: 4,
+                    yAxisID: 'yCount',
+                    order: 2
+                },
+                {
+                    label: 'Verilen Çek (₺)',
+                    type: 'line',
+                    data: trendVouchers,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    pointRadius: 2.5,
+                    yAxisID: 'yAmount',
+                    order: 1
+                },
+                {
+                    label: 'Hakediş (₺)',
+                    type: 'line',
+                    data: trendCalcs,
+                    borderColor: '#10b981',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [4, 4],
+                    tension: 0.3,
+                    pointRadius: 2.5,
+                    yAxisID: 'yAmount',
+                    order: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                yCount: {
+                    type: 'linear',
+                    position: 'left',
+                    beginAtZero: true,
+                    title: { display: true, text: 'İşlem Adedi', font: { size: 10 } },
+                    grid: { color: '#f1f5f9' }
+                },
+                yAmount: {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    title: { display: true, text: 'Tutar (₺)', font: { size: 10 } },
+                    grid: { display: false },
+                    ticks: {
+                        callback: function(value) {
+                            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M ₺';
+                            if (value >= 1000) return (value / 1000).toFixed(0) + 'K ₺';
+                            return value + ' ₺';
+                        }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { maxRotation: 45, minRotation: 0, font: { size: 10 } }
+                }
+            }
+        }
+    });
+
+    // 2. STATÜ GRAFİĞİ (Doughnut)
     const stCtx = document.getElementById('statusChart').getContext('2d');
     const statusLabels = [{% for st in stats.status_counts %}'{{ st.reconciliation_status or "Cevap bekleniyor" }}',{% endfor %}];
     const statusData = [{% for st in stats.status_counts %}{{ st.c }},{% endfor %}];
@@ -236,7 +993,7 @@
         }
     });
 
-    // 2. Marka Grafiği
+    // 3. MARKA GRAFİĞİ (Bar)
     const brCtx = document.getElementById('brandChart').getContext('2d');
     new Chart(brCtx, {
         type: 'bar',
@@ -260,5 +1017,122 @@
             }
         }
     });
+
+    // 4. DİNAMİK PERFORMANS GRAFİĞİ (Horizontal Bar - Mağaza / Temsilci / Model)
+    const perfCtx = document.getElementById('perfChart').getContext('2d');
+    {% if selected_store %}
+    // Seçili Mağazadaki Temsilciler
+    const perfLabels = [{% for rp in rep_performance[:7] %}'{{ rp.process_user }}',{% endfor %}];
+    const perfData = [{% for rp in rep_performance[:7] %}{% if sort_by == 'amount' %}{{ rp.total_voucher }}{% elif sort_by == 'diff' %}{{ rp.total_diff|abs }}{% else %}{{ rp.total }}{% endif %},{% endfor %}];
+    const perfTitle = 'Temsilci ({% if sort_by == "amount" %}Total Çek ₺{% elif sort_by == "diff" %}Fark ₺{% else %}Adet{% endif %})';
+    const perfColor = '#8b5cf6';
+    {% elif selected_model %}
+    // Seçili Modeli Alan Mağazalar
+    const perfLabels = [{% for st in store_performance[:7] %}'{{ st.store_name[:16] }}..',{% endfor %}];
+    const perfData = [{% for st in store_performance[:7] %}{% if sort_by == 'amount' %}{{ st.total_voucher }}{% elif sort_by == 'diff' %}{{ st.total_diff|abs }}{% else %}{{ st.total }}{% endif %},{% endfor %}];
+    const perfTitle = 'Mağaza ({% if sort_by == "amount" %}Total Çek ₺{% elif sort_by == "diff" %}Fark ₺{% else %}Adet{% endif %})';
+    const perfColor = '#10b981';
+    {% else %}
+    // Genel Top 7 Mağaza
+    const perfLabels = [{% for st in store_performance[:7] %}'{{ st.store_name[:16] }}..',{% endfor %}];
+    const perfData = [{% for st in store_performance[:7] %}{% if sort_by == 'amount' %}{{ st.total_voucher }}{% elif sort_by == 'diff' %}{{ st.total_diff|abs }}{% else %}{{ st.total }}{% endif %},{% endfor %}];
+    const perfTitle = 'Mağaza ({% if sort_by == "amount" %}Total Çek ₺{% elif sort_by == "diff" %}Fark ₺{% else %}Adet{% endif %})';
+    const perfColor = '#3b82f6';
+    {% endif %}
+
+    new Chart(perfCtx, {
+        type: 'bar',
+        data: {
+            labels: perfLabels,
+            datasets: [{
+                label: perfTitle,
+                data: perfData,
+                backgroundColor: perfColor,
+                borderRadius: 6,
+                maxBarThickness: 28
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { 
+                    beginAtZero: true, 
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        callback: function(value) {
+                            {% if sort_by == 'amount' or sort_by == 'diff' %}
+                            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M ₺';
+                            if (value >= 1000) return (value / 1000).toFixed(0) + 'K ₺';
+                            return value + ' ₺';
+                            {% else %}
+                            return value;
+                            {% endif %}
+                        }
+                    }
+                },
+                y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+
+    // BAŞLIKLARA GÖRE BÜYÜKTEN KÜÇÜĞE / KÜÇÜKTEN BÜYÜĞE SIRALAMA MOTORU
+    const sortDirections = {};
+
+    function sortTable(tableId, colIndex, isNumeric = false) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        if (rows.length === 0) return;
+
+        const key = tableId + '-' + colIndex;
+        const currentDir = sortDirections[key] === 'asc' ? 'desc' : 'asc';
+        sortDirections[key] = currentDir;
+
+        // İlgili tablonun tüm başlık ikonlarını sıfırla
+        table.querySelectorAll('thead th i.sort-icon').forEach(icon => {
+            icon.className = 'fa-solid fa-sort sort-icon text-[10px] text-slate-300 ml-1';
+        });
+
+        // Aktif başlığın yön ikonunu güncelle
+        const ths = table.querySelectorAll('thead th');
+        if (ths[colIndex]) {
+            const activeIcon = ths[colIndex].querySelector('i.sort-icon');
+            if (activeIcon) {
+                activeIcon.className = currentDir === 'asc'
+                    ? 'fa-solid fa-arrow-up-short-wide sort-icon text-[10px] text-orange-600 font-bold ml-1'
+                    : 'fa-solid fa-arrow-down-wide-short sort-icon text-[10px] text-orange-600 font-bold ml-1';
+            }
+        }
+
+        // Satırları sırala
+        rows.sort((a, b) => {
+            const cellA = a.children[colIndex];
+            const cellB = b.children[colIndex];
+            if (!cellA || !cellB) return 0;
+
+            let valA = cellA.getAttribute('data-value');
+            if (valA === null) valA = cellA.innerText.trim();
+
+            let valB = cellB.getAttribute('data-value');
+            if (valB === null) valB = cellB.innerText.trim();
+
+            if (isNumeric) {
+                const numA = parseFloat(valA) || 0;
+                const numB = parseFloat(valB) || 0;
+                return currentDir === 'asc' ? numA - numB : numB - numA;
+            } else {
+                return currentDir === 'asc' 
+                    ? valA.localeCompare(valB, 'tr') 
+                    : valB.localeCompare(valA, 'tr');
+            }
+        });
+
+        // Sıralanmış satırları tabloya tekrar ekle
+        rows.forEach(r => tbody.appendChild(r));
+    }
 </script>
 {% endblock %}

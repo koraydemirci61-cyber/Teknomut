@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Günlük Veri Yükleme — Teknosa Mutabakat Portalı{% endblock %}
+{% block title %}Günlük Veri Yükleme & Yönetim — Teknosa Mutabakat Portalı{% endblock %}
 
 {% block content %}
 <div class="space-y-6 max-w-5xl mx-auto pb-16">
 
-    <!-- Üst Başlık -->
+    <!-- Üst Başlık & Yönetim Aksiyonları -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div class="flex items-center space-x-3.5">
             <div class="w-12 h-12 rounded-2xl bg-orange-600 text-white flex items-center justify-center font-bold text-xl shadow-md">
@@ -16,16 +16,264 @@
                     <h1 class="text-xl font-bold text-slate-800">Günlük Cihaz Verisi Yükleme</h1>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">Admin Yetkisi</span>
                 </div>
-                <p class="text-xs text-slate-500 mt-0.5">Destek / Teknosa günlük cihaz listesini (Excel) içeri aktarır ve çift kayıtları otomatik engeller</p>
+                <p class="text-xs text-slate-500 mt-0.5">2 adımlı kontrol ve içe aktarma, mükerrer IMEI filtresi ve aktarım geri alma</p>
             </div>
         </div>
-        <a href="/mutabakat" class="text-xs font-semibold text-slate-600 hover:text-slate-800 flex items-center space-x-1.5 self-start md:self-center">
-            <i class="fa-solid fa-list-check"></i>
-            <span>Mutabakat Listesine Git</span>
-        </a>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Toplu Silme Sayfası -->
+            <a href="/admin/bulk-delete" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5" title="Toplu seri veya paket silme">
+                <i class="fa-solid fa-trash-can text-rose-500"></i>
+                <span>Toplu Seri Silme</span>
+            </a>
+
+            <!-- Tüm Datayı Güncelle -->
+            <form action="/admin/recalculate-all" method="POST" onsubmit="return confirm('Tüm veritabanındaki 8.700+ kaydın soru puanları, tavan değerleri ve hakediş farkları yeniden hesaplanacaktır. Devam edilsin mi?')" class="inline">
+                <button type="submit" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5" title="Tüm veritabanındaki hesaplamaları günceller">
+                    <i class="fa-solid fa-arrows-rotate text-blue-500"></i>
+                    <span>Tüm Datayı Güncelle</span>
+                </button>
+            </form>
+
+            <a href="/mutabakat" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-list-check text-slate-500"></i>
+                <span>Mutabakat Listesi</span>
+            </a>
+        </div>
     </div>
 
-    <!-- Sonuç Bildirimi (Yükleme Yapıldıysa) -->
+    <!-- SON AKTARIMI GERİ ALMA KARTI (Varsa) -->
+    {% if last_batch %}
+    <div class="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-start space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg shrink-0 mt-0.5">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Son Yapılan İçe Aktarım</span>
+                <h4 class="font-bold text-slate-900 text-xs">
+                    {{ last_batch.filename }} <span class="font-mono text-slate-500 font-normal">({{ last_batch.batch_id }})</span>
+                </h4>
+                <div class="text-[11px] text-slate-600 mt-0.5 flex flex-wrap gap-3">
+                    <span><i class="fa-solid fa-boxes-stacked mr-1 text-slate-400"></i><strong>{{ last_batch.imported_count }}</strong> Cihaz Eklendi</span>
+                    <span><i class="fa-solid fa-money-check-dollar mr-1 text-slate-400"></i><strong>{{ "{:,.0f}".format(last_batch.total_voucher) }} ₺</strong> Çek Tutarı</span>
+                    <span><i class="fa-solid fa-user mr-1 text-slate-400"></i>{{ last_batch.imported_by }}</span>
+                    <span><i class="fa-solid fa-calendar mr-1 text-slate-400"></i>{{ last_batch.created_at[:16] }}</span>
+                </div>
+            </div>
+        </div>
+
+        <form action="/import/revert-last" method="POST" onsubmit="return confirm('DİKKAT: Son aktarılan \'{{ last_batch.filename }}\' dosyasındaki {{ last_batch.imported_count }} adet cihaz veritabanından kalıcı olarak silinecektir. Bu işlem geri alınamaz! Onaylıyor musunuz?')" class="shrink-0">
+            <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-rotate-left"></i>
+                <span>Son Aktarımı Geri Al / Sil</span>
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- 1. ADIM VE 2. ADIM: İKİ BUTONLU YÜKLEME VE KONTROL PANELİ -->
+    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+
+        <!-- Süreç İlerleme Adımları -->
+        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div class="flex items-center space-x-6 text-xs font-bold">
+                <div class="flex items-center space-x-2 {% if not preview_result and not upload_result %}text-orange-600{% else %}text-slate-400{% endif %}">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs {% if not preview_result and not upload_result %}bg-orange-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">1</span>
+                    <span>Dosya Seç & Kontrol Et</span>
+                </div>
+                <i class="fa-solid fa-chevron-right text-slate-300 text-[10px]"></i>
+                <div class="flex items-center space-x-2 {% if preview_result %}text-emerald-600{% else %}text-slate-400{% endif %}">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs {% if preview_result %}bg-emerald-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">2</span>
+                    <span>Sonuçları İncele & İçe Aktar</span>
+                </div>
+            </div>
+
+            {% if preview_result %}
+            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold flex items-center gap-1">
+                <i class="fa-solid fa-check"></i> Kontrol Tamamlandı
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- 1. ADIM FORMU: DOSYA SEÇ VE KONTROL ET -->
+        <form action="/import/daily/check" method="POST" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Günlük Cihaz Veri Dosyası Seçin (.xlsx / .xls / .csv)
+                </label>
+                <div class="border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-2xl p-6 text-center bg-slate-50/50 hover:bg-orange-50/20 transition cursor-pointer"
+                     onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" required class="hidden"
+                           onchange="showFileName(this)">
+                    <div class="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 mx-auto flex items-center justify-center text-xl mb-2">
+                        <i class="fa-solid fa-file-excel"></i>
+                    </div>
+                    <div class="font-bold text-slate-800 text-sm" id="fileLabelTitle">
+                        Dosyayı buraya sürükleyin veya tıklayarak seçin
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1" id="fileLabelSub">
+                        Format: Destek Günlük Data formatı (MÜŞTERİ, TCKN, TELEFON, IMEI, MODEL, BUYBACK TUTARI vb.)
+                    </p>
+                    <div id="selectedFileInfo" class="mt-2.5 inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold hidden">
+                        <i class="fa-solid fa-check mr-1"></i> <span id="fileNameDisplay"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUTONLAR ALANI -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <div class="text-xs text-slate-500">
+                    <i class="fa-solid fa-shield-halved text-orange-500 mr-1"></i>
+                    <span>Veriler içeri alınmadan önce otomatik olarak mükerrerlik ve format kontrolünden geçer.</span>
+                </div>
+
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <!-- 1. BUTON: KONTROL ET -->
+                    <button type="submit"
+                            class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span>1. Dosyayı Kontrol Et & Doğrula</span>
+                    </button>
+
+                    <!-- 2. BUTON: İÇE AKTAR (KONTROL EDİLMEDEN TIKLANAMAZ) -->
+                    {% if not preview_result %}
+                    <button type="button" disabled
+                            class="flex-1 sm:flex-none bg-slate-200 text-slate-400 px-5 py-2.5 rounded-xl font-bold text-xs cursor-not-allowed opacity-60 flex items-center justify-center space-x-1.5"
+                            title="Lütfen önce 1. Dosyayı Kontrol Et butonuna basınız">
+                        <i class="fa-solid fa-lock"></i>
+                        <span>2. İçe Aktarımı Başlat</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+
+        <!-- KONTROL RAPORU & 2. ADIM AKTARIM FORMU (Eğer Kontrol Edildiyse) -->
+        {% if preview_result %}
+        <div class="mt-6 pt-6 border-t border-slate-200 space-y-5 bg-slate-50/60 p-6 rounded-2xl border border-emerald-200">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-clipboard-check text-emerald-600 text-base"></i>
+                        <span>Ön Kontrol Raporu — {{ preview_result.filename }}</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Dosyadaki tüm satırlar incelendi. İçe aktarmayı onaylamadan önce sonuçları gözden geçirin.</p>
+                </div>
+                <a href="/import/daily" class="text-xs text-slate-500 hover:text-slate-800 underline">Farklı Dosya Seç</a>
+            </div>
+
+            <!-- Sayaç Kutuları -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
+                <div class="p-3 rounded-xl bg-white border border-slate-200 shadow-sm">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Toplam Satır</span>
+                    <span class="text-xl font-extrabold text-slate-800 font-mono">{{ preview_result.total_rows }}</span>
+                </div>
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 shadow-sm">
+                    <span class="text-[10px] font-bold text-emerald-800 uppercase block">Yeni Eklenecek</span>
+                    <span class="text-xl font-extrabold text-emerald-700 font-mono">{{ preview_result.new_count }}</span>
+                </div>
+                <div class="p-3 rounded-xl {% if preview_result.duplicate_count > 0 %}bg-rose-50 border border-rose-200 text-rose-700{% else %}bg-slate-50 border border-slate-200 text-slate-500{% endif %} shadow-sm">
+                    <span class="text-[10px] font-bold uppercase block {% if preview_result.duplicate_count > 0 %}text-rose-800{% else %}text-slate-500{% endif %}">Engellenecek Çift</span>
+                    <span class="text-xl font-extrabold font-mono {% if preview_result.duplicate_count > 0 %}text-rose-700{% else %}text-slate-600{% endif %}">{{ preview_result.duplicate_count }}</span>
+                </div>
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 shadow-sm">
+                    <span class="text-[10px] font-bold text-amber-800 uppercase block">Toplam Çek Tutarı</span>
+                    <span class="text-lg font-extrabold text-amber-800 font-mono">{{ "{:,.0f}".format(preview_result.total_voucher_sum) }} ₺</span>
+                </div>
+            </div>
+
+            <!-- Örnek Satırlar Önizleme Tablosu -->
+            <div>
+                <h4 class="font-bold text-xs text-slate-800 mb-2 flex items-center justify-between">
+                    <span>İlk 12 Satır Önizlemesi</span>
+                    <span class="text-[11px] text-slate-500 font-normal">{{ preview_result.valid_count }} geçerli kayıt incelendi</span>
+                </h4>
+                <div class="overflow-x-auto max-h-56 overflow-y-auto border border-slate-200 rounded-xl bg-white text-xs">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-slate-600 sticky top-0 font-bold border-b border-slate-200 text-[10px] uppercase">
+                            <tr>
+                                <th class="py-2 px-3">Satır</th>
+                                <th class="py-2 px-3">IMEI</th>
+                                <th class="py-2 px-3">Müşteri</th>
+                                <th class="py-2 px-3">Model</th>
+                                <th class="py-2 px-3">Mağaza</th>
+                                <th class="py-2 px-3 text-right">Verilen Çek</th>
+                                <th class="py-2 px-3 text-center">Kontrol Durumu</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for s in preview_result.preview_samples %}
+                            <tr class="hover:bg-slate-50/60">
+                                <td class="py-1.5 px-3 font-mono text-slate-400 text-[11px]">{{ s.row }}</td>
+                                <td class="py-1.5 px-3 font-mono font-bold text-slate-900">{{ s.imei }}</td>
+                                <td class="py-1.5 px-3 text-slate-700">{{ s.customer_name or '-' }}</td>
+                                <td class="py-1.5 px-3 text-slate-700 font-medium">{{ s.model or '-' }}</td>
+                                <td class="py-1.5 px-3 text-slate-600 truncate max-w-[140px]">{{ s.store_name or '-' }}</td>
+                                <td class="py-1.5 px-3 text-right font-mono">{{ "{:,.2f}".format(s.voucher_amount) }} ₺</td>
+                                <td class="py-1.5 px-3 text-center">
+                                    {% if s.status == 'YENİ' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        Yeni Kayıt
+                                    </span>
+                                    {% else %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200" title="{{ s.reason }}">
+                                        {{ s.status }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. ADIM ONAY FORMU (AKTİF VE TIKLANABİLİR) -->
+            <form action="/import/daily/commit" method="POST" class="pt-3 border-t border-slate-200 space-y-4">
+                <input type="hidden" name="preview_token" value="{{ preview_token }}">
+
+                <!-- Çift Kayıt Politikası Seçimi -->
+                <div class="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2">
+                    <span class="text-xs font-bold text-slate-800 block">Çift Kayıt Politikası:</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <label class="flex items-center space-x-2 p-2.5 rounded-lg border border-orange-200 bg-orange-50/40 cursor-pointer">
+                            <input type="radio" name="duplicate_action" value="skip" checked class="text-orange-600 focus:ring-orange-500">
+                            <div>
+                                <span class="font-bold text-slate-800 block">Mükerrerleri Atla (Önerilen)</span>
+                                <span class="text-[11px] text-slate-500">Sadece yeni cihazlar eklenir, mevcut olanlara dokunulmaz.</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                            <input type="radio" name="duplicate_action" value="update" class="text-orange-600 focus:ring-orange-500">
+                            <div>
+                                <span class="font-bold text-slate-800 block">Mevcut Kayıtları Güncelle</span>
+                                <span class="text-[11px] text-slate-500">Mükerrer kayıtların verileri dosyadaki bilgilerle güncellenir.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2. BUTON: AKTARIMI BAŞLAT (ONAYLA) -->
+                <div class="flex items-center justify-between pt-1">
+                    <a href="/import/daily" class="text-xs text-slate-500 hover:text-slate-700 font-semibold">
+                        İptal Et
+                    </a>
+                    <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition flex items-center space-x-2">
+                        <i class="fa-solid fa-file-circle-check"></i>
+                        <span>2. İçe Aktarımı Başlat ({{ preview_result.new_count }} Cihazı Kaydet)</span>
+                    </button>
+                </div>
+            </form>
+
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- YÜKLEME SONUÇ RAPORU (Eğer İçe Aktarım Yapıldıysa) -->
     {% if upload_result %}
     <div class="bg-white p-6 rounded-2xl shadow-md border {% if upload_result.skipped_duplicate_count > 0 %}border-amber-300{% else %}border-emerald-300{% endif %} space-y-4">
         <div class="flex items-start justify-between">
@@ -34,15 +282,14 @@
                     <i class="fa-solid {% if upload_result.skipped_duplicate_count > 0 %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-slate-900 text-sm">Günlük Veri İçe Aktarma Raporu</h3>
-                    <p class="text-xs text-slate-500">Excel dosyası başarıyla işlendi ve mükerrerlik filtresinden geçirildi.</p>
+                    <h3 class="font-bold text-slate-900 text-sm">Günlük Veri İçe Aktarma Başarıyla Tamamlandı</h3>
+                    <p class="text-xs text-slate-500">Paket ID: <strong class="font-mono text-slate-700">{{ upload_result.batch_id }}</strong></p>
                 </div>
             </div>
             <span class="text-xs font-mono text-slate-400">{{ upload_result.total_rows }} Satır İşlendi</span>
         </div>
 
-        <!-- İstatistik Kutucukları -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-center text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-xs">
             <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
                 <span class="text-[10px] font-bold text-emerald-800 uppercase block">Eklenen Yeni Cihazlar</span>
                 <span class="text-2xl font-black text-emerald-700 font-mono">{{ upload_result.imported_count }}</span>
@@ -62,50 +309,14 @@
             </div>
         </div>
 
-        <!-- Engellenen Çift Kayıtlar Listesi (Varsa) -->
-        {% if upload_result.skipped_duplicates %}
-        <div class="pt-3 border-t border-slate-100">
-            <h4 class="font-bold text-xs text-rose-700 flex items-center gap-1.5 mb-2">
-                <i class="fa-solid fa-shield-halved"></i>
-                <span>Otomatik Engellenen Çift IMEI Kayıtları ({{ upload_result.skipped_duplicates|length }})</span>
-            </h4>
-            <div class="overflow-x-auto max-h-56 overflow-y-auto border border-rose-200 rounded-xl text-[11px]">
-                <table class="w-full text-left">
-                    <thead class="bg-rose-50 text-rose-900 sticky top-0 font-bold border-b border-rose-200">
-                        <tr>
-                            <th class="py-2 px-3">Satır</th>
-                            <th class="py-2 px-3">IMEI</th>
-                            <th class="py-2 px-3">Müşteri</th>
-                            <th class="py-2 px-3">Model</th>
-                            <th class="py-2 px-3">Mağaza</th>
-                            <th class="py-2 px-3">Engelleme Nedeni</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-rose-100">
-                        {% for d in upload_result.skipped_duplicates %}
-                        <tr class="hover:bg-rose-50/50">
-                            <td class="py-1.5 px-3 font-mono text-slate-500">{{ d.row }}</td>
-                            <td class="py-1.5 px-3 font-mono font-bold text-rose-800">{{ d.imei }}</td>
-                            <td class="py-1.5 px-3 text-slate-700">{{ d.customer_name or '-' }}</td>
-                            <td class="py-1.5 px-3 text-slate-700">{{ d.model or '-' }}</td>
-                            <td class="py-1.5 px-3 text-slate-600 truncate max-w-[140px]">{{ d.store_name or '-' }}</td>
-                            <td class="py-1.5 px-3 font-medium text-rose-600">{{ d.reason }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Eklenen Yeni Kayıtlar Listesi (Varsa) -->
+        <!-- Eklenen Kayıtlar Listesi -->
         {% if upload_result.imported_records %}
         <div class="pt-3 border-t border-slate-100">
             <h4 class="font-bold text-xs text-emerald-700 flex items-center gap-1.5 mb-2">
                 <i class="fa-solid fa-check-circle"></i>
-                <span>Başarıyla Eklenen Yeni Cihazlar ({{ upload_result.imported_records|length }})</span>
+                <span>Başarıyla Eklenen Cihazlar (İlk 20)</span>
             </h4>
-            <div class="overflow-x-auto max-h-60 overflow-y-auto border border-slate-200 rounded-xl text-[11px]">
+            <div class="overflow-x-auto max-h-56 overflow-y-auto border border-slate-200 rounded-xl text-[11px]">
                 <table class="w-full text-left">
                     <thead class="bg-slate-50 text-slate-700 sticky top-0 font-bold border-b border-slate-200">
                         <tr>
@@ -136,85 +347,13 @@
     </div>
     {% endif %}
 
-    <!-- Yükleme Formu -->
-    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-        <form action="/import/daily" method="POST" enctype="multipart/form-data" class="space-y-6">
-            
-            <!-- Dosya Seçme Alanı (Drag & Drop) -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                    Günlük Cihaz Veri Dosyasını Seçin (.xlsx / .xls / .csv)
-                </label>
-                <div class="border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-2xl p-8 text-center bg-slate-50/50 hover:bg-orange-50/20 transition cursor-pointer"
-                     onclick="document.getElementById('fileInput').click()">
-                    <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" required class="hidden"
-                           onchange="showFileName(this)">
-                    <div class="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 mx-auto flex items-center justify-center text-2xl mb-3">
-                        <i class="fa-solid fa-file-excel"></i>
-                    </div>
-                    <div class="font-bold text-slate-800 text-sm" id="fileLabelTitle">
-                        Dosyayı buraya sürükleyin veya tıklayarak seçin
-                    </div>
-                    <p class="text-xs text-slate-400 mt-1" id="fileLabelSub">
-                        Format: Destek Günlük Data formatı (MÜŞTERİ, TCKN, TELEFON, IMEI, MARKA, MODEL, BUYBACK TUTARI vb.)
-                    </p>
-                    <div id="selectedFileInfo" class="mt-3 inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold hidden">
-                        <i class="fa-solid fa-check mr-1"></i> <span id="fileNameDisplay"></span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Çift Kayıt Politikası Ayarları -->
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <i class="fa-solid fa-shield-halved text-orange-600"></i>
-                    <span>Otomatik Mükerrer (Çift Kayıt) Kontrol Politikası</span>
-                </span>
-                <p class="text-[11px] text-slate-500 leading-relaxed">
-                    Yüklenen Excel dosyasındaki her IMEI hem dosya içinde hem de veritabanındaki 8.699+ kayıt arasında kontrol edilir.
-                </p>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <label class="flex items-start space-x-2.5 p-3 rounded-xl border border-orange-300 bg-orange-50/40 cursor-pointer">
-                        <input type="radio" name="duplicate_action" value="skip" checked class="mt-0.5 text-orange-600 focus:ring-orange-500">
-                        <div class="text-xs">
-                            <span class="font-bold text-slate-800 block">Çift Kayıtları Engelle ve Atla (Varsayılan)</span>
-                            <span class="text-[11px] text-slate-500">Mevcut IMEI'ler asla tekrar eklenmez, sadece yeni cihazlar içeri alınır.</span>
-                        </div>
-                    </label>
-
-                    <label class="flex items-start space-x-2.5 p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer">
-                        <input type="radio" name="duplicate_action" value="update" class="mt-0.5 text-orange-600 focus:ring-orange-500">
-                        <div class="text-xs">
-                            <span class="font-bold text-slate-800 block">Mevcut Kayıtları Güncelle</span>
-                            <span class="text-[11px] text-slate-500">Mükerrer IMEI varsa yeni satır açmaz, var olan kaydı günceller.</span>
-                        </div>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Butonlar -->
-            <div class="flex items-center justify-between pt-2">
-                <a href="/mutabakat" class="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
-                    İptal / Listeye Dön
-                </a>
-                <button type="submit"
-                        class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-md hover:shadow-lg transition flex items-center space-x-2">
-                    <i class="fa-solid fa-file-import"></i>
-                    <span>Verileri Kontrol Et ve İçeri Aktar</span>
-                </button>
-            </div>
-
-        </form>
-    </div>
-
     <!-- Desteklenen Excel Formatı Bilgilendirme Kartı -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-xs">
         <h3 class="font-bold text-slate-800 text-xs uppercase text-orange-600 mb-2 flex items-center">
             <i class="fa-solid fa-circle-info mr-1.5"></i> Desteklenen Günlük Excel Başlık Formatı
         </h3>
         <p class="text-slate-500 mb-3">
-            Sistem ekteki <code>Destek Kasım Data.xlsx</code> formatındaki başlıkları otomatik tanır:
+            Sistem <code>Destek Kasım Data.xlsx</code> formatındaki başlıkları otomatik tanır:
         </p>
         <div class="flex flex-wrap gap-1.5 font-mono text-[10px]">
             <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border">MÜŞTERİ</span>
@@ -246,7 +385,7 @@
             document.getElementById('fileNameDisplay').innerText = name;
             document.getElementById('selectedFileInfo').classList.remove('hidden');
             document.getElementById('fileLabelTitle').innerText = name;
-            document.getElementById('fileLabelSub').innerText = (input.files[0].size / 1024).toFixed(1) + ' KB - Yüklemeye hazır';
+            document.getElementById('fileLabelSub').innerText = (input.files[0].size / 1024).toFixed(1) + ' KB - Kontrol edilmeye hazır';
         }
     }
 </script>

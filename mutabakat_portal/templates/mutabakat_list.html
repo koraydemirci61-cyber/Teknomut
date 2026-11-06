@@ -12,7 +12,7 @@
             <p class="text-xs text-slate-500 mt-0.5">Toplam <strong>{{ "{:,}".format(total_count) }}</strong> kayıt bulundu (Sayfa {{ page }} / {{ total_pages }})</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <a href="/export/excel?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}"
+            <a href="/export/excel?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&period={{ period_filter }}&start_date={{ start_date }}&end_date={{ end_date }}"
                class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
                 <i class="fa-solid fa-file-excel"></i>
                 <span>Excel Olarak İndir</span>
@@ -27,8 +27,46 @@
         </div>
     </div>
 
+    <!-- Aktif Filtre Rozetleri -->
+    {% if store_filter or rep_filter or model_filter or start_date or end_date %}
+    <div class="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-slate-400 font-semibold text-[11px]">Aktif Filtreler:</span>
+        {% if store_filter %}
+        <span class="inline-flex items-center bg-blue-50 text-blue-800 px-2.5 py-1 rounded-lg border border-blue-200 font-medium">
+            <i class="fa-solid fa-store mr-1 text-blue-500"></i> {{ store_filter }}
+            <a href="/mutabakat?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&rep={{ rep_filter }}&model={{ model_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="ml-1.5 text-blue-500 hover:text-blue-800"><i class="fa-solid fa-xmark"></i></a>
+        </span>
+        {% endif %}
+        {% if rep_filter %}
+        <span class="inline-flex items-center bg-purple-50 text-purple-800 px-2.5 py-1 rounded-lg border border-purple-200 font-medium">
+            <i class="fa-solid fa-user-tie mr-1 text-purple-500"></i> {{ rep_filter }}
+            <a href="/mutabakat?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&model={{ model_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="ml-1.5 text-purple-500 hover:text-purple-800"><i class="fa-solid fa-xmark"></i></a>
+        </span>
+        {% endif %}
+        {% if model_filter %}
+        <span class="inline-flex items-center bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 font-medium">
+            <i class="fa-solid fa-mobile-screen mr-1 text-emerald-500"></i> {{ model_filter }}
+            <a href="/mutabakat?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="ml-1.5 text-emerald-500 hover:text-emerald-800"><i class="fa-solid fa-xmark"></i></a>
+        </span>
+        {% endif %}
+        {% if start_date or end_date %}
+        <span class="inline-flex items-center bg-orange-50 text-orange-800 px-2.5 py-1 rounded-lg border border-orange-200 font-medium">
+            <i class="fa-regular fa-calendar mr-1 text-orange-500"></i> {{ start_date or 'Başlangıç' }} - {{ end_date or 'Bitiş' }}
+            <a href="/mutabakat?q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&model={{ model_filter }}" class="ml-1.5 text-orange-500 hover:text-orange-800"><i class="fa-solid fa-xmark"></i></a>
+        </span>
+        {% endif %}
+        <a href="/mutabakat" class="text-rose-600 hover:underline font-semibold ml-2">Filtreleri Temizle</a>
+    </div>
+    {% endif %}
+
     <!-- Arama ve Filtre Formu -->
     <form method="GET" action="/mutabakat" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <input type="hidden" name="store" value="{{ store_filter }}">
+        <input type="hidden" name="rep" value="{{ rep_filter }}">
+        <input type="hidden" name="model" value="{{ model_filter }}">
+        <input type="hidden" name="start_date" value="{{ start_date }}">
+        <input type="hidden" name="end_date" value="{{ end_date }}">
+        <input type="hidden" name="period" value="{{ period_filter }}">
         <!-- Arama Kelimesi -->
         <div class="md:col-span-2 relative">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -180,15 +218,15 @@
             </span>
             <div class="flex items-center space-x-1.5">
                 {% if page > 1 %}
-                <a href="/mutabakat?page=1&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">« İlk</a>
-                <a href="/mutabakat?page={{ page - 1 }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">‹ Önceki</a>
+                <a href="/mutabakat?page=1&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&model={{ model_filter }}&period={{ period_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">« İlk</a>
+                <a href="/mutabakat?page={{ page - 1 }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&model={{ model_filter }}&period={{ period_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">‹ Önceki</a>
                 {% endif %}
 
                 <span class="px-3 py-1.5 rounded-lg bg-orange-600 text-white font-bold">{{ page }}</span>
 
                 {% if page < total_pages %}
-                <a href="/mutabakat?page={{ page + 1 }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">Sonraki ›</a>
-                <a href="/mutabakat?page={{ total_pages }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">Son »</a>
+                <a href="/mutabakat?page={{ page + 1 }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&model={{ model_filter }}&period={{ period_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">Sonraki ›</a>
+                <a href="/mutabakat?page={{ total_pages }}&q={{ q }}&status={{ status_filter }}&diff={{ diff_filter }}&store={{ store_filter }}&rep={{ rep_filter }}&model={{ model_filter }}&period={{ period_filter }}&start_date={{ start_date }}&end_date={{ end_date }}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-slate-700">Son »</a>
                 {% endif %}
             </div>
         </div>
