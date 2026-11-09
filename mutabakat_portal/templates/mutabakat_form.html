@@ -211,10 +211,10 @@
                             <span class="font-bold text-slate-800 text-xs block">{{ q.title }}</span>
                         </div>
                         <div class="sm:w-72 shrink-0">
-                            <select id="{{ q.id }}" name="{{ q.id }}" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-orange-500 question-input" onchange="recalcValuation()">
+                            <select id="{{ q.code or q.id }}" name="{{ q.code or q.id }}" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-orange-500 question-input" onchange="recalcValuation()">
                                 {% for opt in q.options %}
-                                <option value="{{ opt.val }}" {% if is_edit and record[q.id] == opt.val %}selected{% endif %}>
-                                    {{ opt.label }}
+                                <option value="{{ opt.val }}" data-penalty="{{ opt.penalty }}" {% if is_edit and record[q.code or q.id] == opt.val %}selected{% endif %}>
+                                    {{ opt.label }}{% if opt.penalty and opt.penalty > 0 %} (-%{{ opt.penalty|int }}){% endif %}
                                 </option>
                                 {% endfor %}
                             </select>
@@ -360,33 +360,15 @@
     function recalcValuation() {
         let penalty = 0.0;
 
-        // Q1-Q4
-        const q1 = document.getElementById('q1_working')?.value;
-        if (q1 === 'Y') penalty += 100.0;
-        const q2 = document.getElementById('q2_btk')?.value;
-        if (q2 === 'Y') penalty += 100.0;
-        const q3 = document.getElementById('q3_home_faceid')?.value;
-        if (q3 === 'Y') penalty += 40.0;
-        const q4 = document.getElementById('q4_icloud')?.value;
-        if (q4 === 'Y') penalty += 70.0;
-
-        // Apple
-        const al = document.getElementById('q5_apple_body')?.value;
-        if (al === 'Y') penalty += 15.0; else if (al === 'D') penalty += 10.0;
-        const am = document.getElementById('q6_apple_screen')?.value;
-        if (am === 'Y') penalty += 40.0; else if (am === 'D') penalty += 15.0;
-        const an = document.getElementById('q7_apple_camera')?.value;
-        if (an === 'Y') penalty += 25.0; else if (an === 'D') penalty += 15.0;
-        const ao = document.getElementById('q8_apple_battery')?.value;
-        if (ao === 'Y') penalty += 25.0; else if (ao === 'D') penalty += 15.0;
-
-        // Android
-        const ap = document.getElementById('q5_android_camera')?.value;
-        if (ap === 'Y') penalty += 40.0;
-        const aq = document.getElementById('q6_android_body')?.value;
-        if (aq === 'Y') penalty += 20.0; else if (aq === 'D') penalty += 15.0;
-        const ar = document.getElementById('q7_android_screen')?.value;
-        if (ar === 'Y') penalty += 40.0; else if (ar === 'D') penalty += 20.0;
+        document.querySelectorAll('.question-input').forEach(select => {
+            const card = select.closest('.question-card');
+            if (card && card.style.display !== 'none') {
+                const opt = select.options[select.selectedIndex];
+                if (opt && opt.dataset.penalty) {
+                    penalty += parseFloat(opt.dataset.penalty) || 0.0;
+                }
+            }
+        });
 
         // Update live penalty display
         document.getElementById('livePenalty').innerText = '-%' + penalty.toFixed(0);

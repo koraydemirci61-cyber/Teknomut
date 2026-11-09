@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+
+{% block title %}Hasar & Fonksiyon Soru Kriterleri — Teknosa Mutabakat Portalı{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-6xl mx-auto pb-12">
+
+    <!-- Üst Başlık & Buton -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+            <div class="flex items-center space-x-2.5">
+                <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold text-lg">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-slate-800 tracking-tight">Cihaz Fonksiyon & Hasar Sorgu Yönetimi</h1>
+                    <p class="text-xs text-slate-500">Buyback ekspertiz soru maddeleri, seçenekler ve %lik ceza puanı kesintileri</p>
+                </div>
+            </div>
+        </div>
+        <button onclick="openNewQuestionModal()"
+                class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-orange-600/20 transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-plus-circle"></i>
+            <span>Yeni Soru Maddesi Ekle</span>
+        </button>
+    </div>
+
+    <!-- Önemli Bilgilendirme Kartı -->
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-4 rounded-2xl flex items-start space-x-3.5">
+        <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+            <i class="fa-solid fa-scale-balanced text-sm"></i>
+        </div>
+        <div class="text-xs leading-relaxed text-slate-700">
+            <span class="font-bold text-amber-950 block text-sm mb-0.5">Dinamik Hakediş & Ceza Puanı Kuralı</span>
+            Burada yapılan herhangi bir ceza puanı veya soru maddesi değişikliği kaydedilirken sistem size soracaktır:
+            <strong>"Sadece bundan sonraki yeni/düzeltilecek mutabakatlar için mi"</strong> yoksa <strong>"Tüm veritabanı (8.700+ cihaz) için mi"</strong> geçerli olmasını istediğinizi seçebilir veya işlemi tamamen iptal edebilirsiniz.
+        </div>
+    </div>
+
+    <!-- İstatistik Kartları -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Toplam Kriter</div>
+            <div class="text-2xl font-black text-slate-800">{{ stats.total }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Sistemdeki tüm soru maddeleri</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Aktif Kriterler</div>
+            <div class="text-2xl font-black text-emerald-600">{{ stats.active }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Formda sorulan sorular</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Apple Özel Sorular</div>
+            <div class="text-2xl font-black text-slate-700">{{ stats.apple_count }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Yalnızca iPhone kontrolleri</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Android Özel Sorular</div>
+            <div class="text-2xl font-black text-emerald-700">{{ stats.android_count }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Yalnızca Android kontrolleri</div>
+        </div>
+    </div>
+
+    <!-- Soru Maddeleri Tablosu -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-slate-50/60 border-b border-slate-200 flex items-center justify-between">
+            <div class="text-xs font-bold text-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-list text-slate-400"></i>
+                <span>Tanımlı Soru Maddeleri ve Ceza Puanı Yüzdeleri</span>
+            </div>
+            <div class="text-[11px] text-slate-500">
+                Toplam <strong>{{ questions|length }}</strong> kriter maddesi
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase text-[10px] tracking-wider">
+                        <th class="py-3.5 px-4 w-12 text-center">Sıra</th>
+                        <th class="py-3.5 px-4">Soru Tanımı & Kodu</th>
+                        <th class="py-3.5 px-4">Cihaz Grubu</th>
+                        <th class="py-3.5 px-4">Seçenekler ve % Ceza Puanları</th>
+                        <th class="py-3.5 px-4">Durum</th>
+                        <th class="py-3.5 px-4 text-right">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for q in questions %}
+                    <tr class="hover:bg-slate-50/60 transition {% if not q.is_active %}opacity-60 bg-slate-50/30{% endif %}">
+                        <!-- Sıra -->
+                        <td class="py-3.5 px-4 font-mono font-bold text-center text-slate-400">
+                            {{ q.order_num }}
+                        </td>
+
+                        <!-- Soru Başlığı & Kod -->
+                        <td class="py-3.5 px-4">
+                            <span class="font-bold text-slate-800 block text-xs">{{ q.title }}</span>
+                            <span class="font-mono text-[10px] text-slate-400">{{ q.code }}</span>
+                        </td>
+
+                        <!-- Cihaz Grubu -->
+                        <td class="py-3.5 px-4">
+                            {% if q.device_group == 'ALL' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                <i class="fa-solid fa-mobile-screen text-[9px]"></i> Tüm Cihazlar
+                            </span>
+                            {% elif q.device_group == 'APPLE' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-white border border-slate-900">
+                                <i class="fa-brands fa-apple text-[10px]"></i> Yalnızca Apple
+                            </span>
+                            {% elif q.device_group == 'ANDROID' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <i class="fa-brands fa-android text-[10px]"></i> Yalnızca Android
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Seçenekler ve Puanlar -->
+                        <td class="py-3.5 px-4">
+                            <div class="flex flex-wrap gap-1.5">
+                                {% for opt in q.options %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-lg text-[11px] {% if opt.penalty > 0 %}bg-rose-50 text-rose-800 border border-rose-200 font-semibold{% else %}bg-emerald-50 text-emerald-800 border border-emerald-200{% endif %}">
+                                    <span>{{ opt.label }}</span>
+                                    {% if opt.penalty > 0 %}
+                                    <span class="font-mono font-bold ml-1 text-rose-600">(-%{{ opt.penalty|int }})</span>
+                                    {% else %}
+                                    <span class="font-mono text-[10px] ml-1 text-emerald-600 font-bold">(0)</span>
+                                    {% endif %}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </td>
+
+                        <!-- Durum -->
+                        <td class="py-3.5 px-4">
+                            {% if q.is_active %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span> Aktif
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span> Pasif / Çıkartılmış
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- İşlemler -->
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="inline-flex items-center space-x-1.5">
+                                <!-- Düzenle Butonu -->
+                                <button type="button"
+                                        onclick="openEditQuestionModal({{ q|tojson|forceescape }})"
+                                        title="Madde ve Ceza Puanlarını Düzenle"
+                                        class="px-2.5 py-1.5 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg font-semibold text-[11px] transition border border-slate-200 flex items-center gap-1">
+                                    <i class="fa-solid fa-pen-to-square text-[10px] text-orange-500"></i>
+                                    <span>Düzenle</span>
+                                </button>
+
+                                <!-- Aktif/Pasif Yap (Çıkartma) Butonu -->
+                                <button type="button"
+                                        onclick="openToggleModal({{ q.id }}, '{{ q.title|replace("'", "\\'") }}', {{ 1 if q.is_active else 0 }})"
+                                        title="{% if q.is_active %}Maddeyi Çıkart / Pasif Yap{% else %}Maddeyi Aktifleştir{% endif %}"
+                                        class="px-2.5 py-1.5 {% if q.is_active %}bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800{% else %}bg-emerald-50 hover:bg-emerald-100 text-emerald-700{% endif %} rounded-lg font-semibold text-[11px] transition border border-slate-200 flex items-center gap-1">
+                                    {% if q.is_active %}
+                                        <i class="fa-solid fa-eye-slash text-[10px] text-amber-600"></i>
+                                        <span>Çıkart</span>
+                                    {% else %}
+                                        <i class="fa-solid fa-eye text-[10px] text-emerald-600"></i>
+                                        <span>Aktif Et</span>
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- YENİ MADDE EKLEME MODALI -->
+<div id="newQuestionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 transform transition-all max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-plus-circle text-base"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base">Yeni Soru / Hasar Maddesi Ekle</h3>
+                    <p class="text-[11px] text-slate-400">Buyback ekspertiz formuna yeni bir kontrol kriteri ekleyin</p>
+                </div>
+            </div>
+            <button onclick="closeNewQuestionModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <form action="/admin/questions/new" method="POST" class="space-y-4 text-xs overflow-y-auto pr-1 flex-grow">
+            <!-- Soru Başlığı -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Soru Tanımı / Başlığı <span class="text-rose-500">*</span></label>
+                <input type="text" name="title" required placeholder="Örn: 9. Mikrofon ve Hoparlör Durumu"
+                       class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-medium">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <!-- Soru Kodu -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Soru Kodu (Opsiyonel)</label>
+                    <input type="text" name="code" placeholder="Örn: q9_audio"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-mono text-[11px]">
+                    <span class="text-[10px] text-slate-400 block mt-0.5">Boş bırakılırsa otomatik üretilir.</span>
+                </div>
+
+                <!-- Cihaz Grubu -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Cihaz Grubu <span class="text-rose-500">*</span></label>
+                    <select name="device_group" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-medium text-slate-700">
+                        <option value="ALL">Tüm Cihazlar (Her Cihazda Sorulur)</option>
+                        <option value="APPLE">Yalnızca Apple (iPhone Modelleri)</option>
+                        <option value="ANDROID">Yalnızca Android Modelleri</option>
+                    </select>
+                </div>
+
+                <!-- Sıra No -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Sıra Numarası</label>
+                    <input type="number" name="order_num" value="{{ (questions|length) + 1 }}" min="1" max="99"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-mono text-center">
+                </div>
+            </div>
+
+            <!-- Seçenekler ve Ceza Puanları -->
+            <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-700 text-xs">Cevap Seçenekleri ve %lik Ceza Kesintileri</span>
+                    <button type="button" onclick="addNewOptionRow()" class="text-orange-600 hover:text-orange-700 font-bold text-[11px] flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Seçenek Ekle
+                    </button>
+                </div>
+                <div id="newOptionsContainer" class="space-y-2">
+                    <!-- Varsayılan 0 Ceza -->
+                    <div class="flex items-center gap-2 option-row">
+                        <input type="text" name="opt_label" value="Sorun Yok / Temiz" required placeholder="Seçenek Adı"
+                               class="flex-grow px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs">
+                        <input type="text" name="opt_val" value="" placeholder="Değer (örn: D, Y)"
+                               class="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center">
+                        <div class="flex items-center gap-1 w-28">
+                            <span class="text-slate-400 font-bold">-%</span>
+                            <input type="number" name="opt_penalty" value="0" min="0" max="100"
+                                   class="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center font-bold text-emerald-600">
+                        </div>
+                    </div>
+                    <!-- Hasar Seçeneği 1 -->
+                    <div class="flex items-center gap-2 option-row">
+                        <input type="text" name="opt_label" value="Arızalı / Hasarlı" required placeholder="Seçenek Adı"
+                               class="flex-grow px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs">
+                        <input type="text" name="opt_val" value="Y" placeholder="Değer (örn: D, Y)"
+                               class="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center">
+                        <div class="flex items-center gap-1 w-28">
+                            <span class="text-rose-500 font-bold">-%</span>
+                            <input type="number" name="opt_penalty" value="20" min="0" max="100"
+                                   class="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center font-bold text-rose-600">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEĞİŞİKLİK KAPSAMI SEÇİMİ (SORU SORMA) -->
+            <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-2">
+                <span class="font-bold text-amber-950 text-xs block flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-question text-amber-600"></i>
+                    Bu Yeni Madde Hangi Kayıtlara Uygulansın?
+                </span>
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/30 transition">
+                        <input type="radio" name="apply_scope" value="future" checked class="mt-0.5 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="font-bold text-slate-800 block">Sadece Bundan Sonraki Kayıtlar İçin Geçerli Olsun</span>
+                            <span class="text-[11px] text-slate-500">Değişim anı itibariyle yeni girilecek ve güncellenecek mutabakat kayıtlarında sorulur. Geçmiş kayıtlar korunur.</span>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/30 transition">
+                        <input type="radio" name="apply_scope" value="all" class="mt-0.5 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="font-bold text-slate-800 block">Tüm Veritabanına Uygula & Yeniden Hesapla</span>
+                            <span class="text-[11px] text-slate-500">Mevcut tüm kayıtlar (8.700+ adet) bu yeni kurala göre anında baştan sona yeniden hesaplanır.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Butonlar -->
+            <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeNewQuestionModal()"
+                        class="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-bold transition">
+                    İptal Et
+                </button>
+                <button type="submit"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-orange-600/20 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Maddeyi Kaydet</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- DÜZENLEME MODALI -->
+<div id="editQuestionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 transform transition-all max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-sliders text-base"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base">Soru & Ceza Puanlarını Düzenle</h3>
+                    <p id="editModalSubtitle" class="text-[11px] text-slate-400 font-mono"></p>
+                </div>
+            </div>
+            <button onclick="closeEditQuestionModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <form id="editQuestionForm" method="POST" class="space-y-4 text-xs overflow-y-auto pr-1 flex-grow">
+            <!-- Soru Başlığı -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Soru Tanımı / Başlığı <span class="text-rose-500">*</span></label>
+                <input type="text" id="edit_title" name="title" required
+                       class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-medium">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Cihaz Grubu -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Cihaz Grubu</label>
+                    <select id="edit_device_group" name="device_group" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-medium text-slate-700">
+                        <option value="ALL">Tüm Cihazlar (Her Cihazda Sorulur)</option>
+                        <option value="APPLE">Yalnızca Apple (iPhone Modelleri)</option>
+                        <option value="ANDROID">Yalnızca Android Modelleri</option>
+                    </select>
+                </div>
+
+                <!-- Sıra No -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Sıra Numarası</label>
+                    <input type="number" id="edit_order_num" name="order_num" min="1" max="99"
+                           class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 font-mono text-center">
+                </div>
+            </div>
+
+            <!-- Seçenekler ve Ceza Puanları Listesi -->
+            <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="font-bold text-slate-700 text-xs block">Seçenekler ve %lik Ceza Puanları</span>
+                        <span class="text-[10px] text-slate-400">Her cevabın hakedişe etki eden ceza kesinti yüzdesi</span>
+                    </div>
+                    <button type="button" onclick="addEditOptionRow()" class="text-orange-600 hover:text-orange-700 font-bold text-[11px] flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Seçenek Ekle
+                    </button>
+                </div>
+                <div id="editOptionsContainer" class="space-y-2">
+                    <!-- Dinamik JS ile doldurulur -->
+                </div>
+            </div>
+
+            <!-- DEĞİŞİKLİK KAPSAMI SEÇİMİ (SORU SORMA) -->
+            <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-2">
+                <span class="font-bold text-amber-950 text-xs block flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-question text-amber-600"></i>
+                    Yapılan Değişiklik Hangi Kayıtlara Uygulansın?
+                </span>
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/30 transition">
+                        <input type="radio" name="apply_scope" value="future" checked class="mt-0.5 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="font-bold text-slate-800 block">Sadece Bundan Sonraki Kayıtlar İçin Geçerli Olsun</span>
+                            <span class="text-[11px] text-slate-500">Değişim anı itibariyle yeni girilecek ve güncellenecek kayıtlarda bu puanlar uygulanır. Geçmiş kayıtlar korunur.</span>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2.5 p-2 bg-white rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/30 transition">
+                        <input type="radio" name="apply_scope" value="all" class="mt-0.5 text-orange-600 focus:ring-orange-500">
+                        <div>
+                            <span class="font-bold text-slate-800 block">Tüm Veritabanına Uygula & Yeniden Hesapla</span>
+                            <span class="text-[11px] text-slate-500">Mevcut tüm kayıtlar (8.700+ adet) yeni ceza puanlarına göre anında baştan sona yeniden hesaplanır.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Butonlar -->
+            <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeEditQuestionModal()"
+                        class="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-bold transition">
+                    İptal Et
+                </button>
+                <button type="submit"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-orange-600/20 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Değişiklikleri Kaydet</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- DURUM DEĞİŞTİRME / ÇIKARTMA ONAY MODALI -->
+<div id="toggleModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-exclamation text-amber-500"></i>
+                <span id="toggleModalTitle">Maddeyi Çıkart / Pasif Yap</span>
+            </h3>
+            <button onclick="closeToggleModal()" class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="toggleForm" method="POST" class="space-y-4 text-xs">
+            <p id="toggleModalDesc" class="text-slate-600 leading-relaxed"></p>
+
+            <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-3.5 space-y-2">
+                <span class="font-bold text-amber-950 text-xs block">İşlem Kapsamını Belirleyin:</span>
+                <label class="flex items-start gap-2 p-2 bg-white rounded-xl border border-amber-200 cursor-pointer">
+                    <input type="radio" name="apply_scope" value="future" checked class="mt-0.5 text-orange-600 focus:ring-orange-500">
+                    <div>
+                        <span class="font-bold text-slate-800 block text-[11px]">Sadece Bundan Sonraki Kayıtlar</span>
+                        <span class="text-[10px] text-slate-500">Geçmiş kayıtların hesaplamaları değiştirilmez.</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-2 p-2 bg-white rounded-xl border border-amber-200 cursor-pointer">
+                    <input type="radio" name="apply_scope" value="all" class="mt-0.5 text-orange-600 focus:ring-orange-500">
+                    <div>
+                        <span class="font-bold text-slate-800 block text-[11px]">Tüm Veritabanına Uygula & Yeniden Hesapla</span>
+                        <span class="text-[10px] text-slate-500">Geçmiş tüm kayıtlar bu madde hariç tutularak yeniden hesaplanır.</span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeToggleModal()"
+                        class="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-semibold transition">
+                    İptal Et
+                </button>
+                <button type="submit"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl font-bold shadow-md shadow-orange-600/20 transition">
+                    Onayla ve Kaydet
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openNewQuestionModal() {
+        document.getElementById('newQuestionModal').classList.remove('hidden');
+    }
+    function closeNewQuestionModal() {
+        document.getElementById('newQuestionModal').classList.add('hidden');
+    }
+
+    function addNewOptionRow() {
+        const container = document.getElementById('newOptionsContainer');
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 option-row';
+        div.innerHTML = `
+            <input type="text" name="opt_label" required placeholder="Seçenek Adı (örn: Ağır Hasarlı)"
+                   class="flex-grow px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs">
+            <input type="text" name="opt_val" value="X" placeholder="Değer (örn: D, Y, X)"
+                   class="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center">
+            <div class="flex items-center gap-1 w-28">
+                <span class="text-rose-500 font-bold">-%</span>
+                <input type="number" name="opt_penalty" value="15" min="0" max="100"
+                       class="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center font-bold text-rose-600">
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="p-1.5 text-slate-400 hover:text-rose-600">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    }
+
+    function openEditQuestionModal(q) {
+        document.getElementById('editModalSubtitle').textContent = q.code + ' (ID: #' + q.id + ')';
+        document.getElementById('editQuestionForm').action = '/admin/questions/' + q.id + '/edit';
+        document.getElementById('edit_title').value = q.title;
+        document.getElementById('edit_device_group').value = q.device_group || 'ALL';
+        document.getElementById('edit_order_num').value = q.order_num || 0;
+
+        const container = document.getElementById('editOptionsContainer');
+        container.innerHTML = '';
+        (q.options || []).forEach(opt => {
+            const isZero = (opt.penalty === 0 || !opt.penalty);
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 option-row';
+            div.innerHTML = `
+                <input type="text" name="opt_label" value="${opt.label || ''}" required placeholder="Seçenek Adı"
+                       class="flex-grow px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs">
+                <input type="text" name="opt_val" value="${opt.val !== undefined ? opt.val : ''}" placeholder="Değer (örn: D, Y)"
+                       class="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center">
+                <div class="flex items-center gap-1 w-28">
+                    <span class="${isZero ? 'text-slate-400' : 'text-rose-500'} font-bold">-%</span>
+                    <input type="number" name="opt_penalty" value="${opt.penalty || 0}" min="0" max="100"
+                           class="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center font-bold ${isZero ? 'text-emerald-600' : 'text-rose-600'}">
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="p-1.5 text-slate-400 hover:text-rose-600">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            `;
+            container.appendChild(div);
+        });
+
+        document.getElementById('editQuestionModal').classList.remove('hidden');
+    }
+
+    function addEditOptionRow() {
+        const container = document.getElementById('editOptionsContainer');
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 option-row';
+        div.innerHTML = `
+            <input type="text" name="opt_label" required placeholder="Yeni Seçenek Adı"
+                   class="flex-grow px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs">
+            <input type="text" name="opt_val" value="X" placeholder="Değer (örn: D, Y, X)"
+                   class="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center">
+            <div class="flex items-center gap-1 w-28">
+                <span class="text-rose-500 font-bold">-%</span>
+                <input type="number" name="opt_penalty" value="15" min="0" max="100"
+                       class="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-center font-bold text-rose-600">
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="p-1.5 text-slate-400 hover:text-rose-600">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    }
+
+    function closeEditQuestionModal() {
+        document.getElementById('editQuestionModal').classList.add('hidden');
+    }
+
+    function openToggleModal(qId, title, isActive) {
+        document.getElementById('toggleForm').action = '/admin/questions/' + qId + '/toggle-status';
+        if (isActive) {
+            document.getElementById('toggleModalTitle').textContent = 'Maddeyi Çıkart / Pasife Al';
+            document.getElementById('toggleModalDesc').innerHTML = '<strong>"' + title + '"</strong> soru maddesi formdan çıkartılarak devre dışı bırakılacaktır.';
+        } else {
+            document.getElementById('toggleModalTitle').textContent = 'Maddeyi Tekrar Aktif Et';
+            document.getElementById('toggleModalDesc').innerHTML = '<strong>"' + title + '"</strong> soru maddesi tekrar forma dahil edilerek aktif hale getirilecektir.';
+        }
+        document.getElementById('toggleModal').classList.remove('hidden');
+    }
+
+    function closeToggleModal() {
+        document.getElementById('toggleModal').classList.add('hidden');
+    }
+
+    // ESC Tuşu ile Modalları Kapat
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeNewQuestionModal();
+            closeEditQuestionModal();
+            closeToggleModal();
+        }
+    });
+</script>
+{% endblock %}

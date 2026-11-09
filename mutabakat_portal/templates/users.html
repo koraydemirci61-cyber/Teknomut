@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Kullanıcı ve Şifre Yönetimi — Teknosa Mutabakat Portalı{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-6xl mx-auto">
+
+    <!-- Üst Başlık & Buton -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+            <div class="flex items-center space-x-2.5">
+                <div class="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold text-lg">
+                    <i class="fa-solid fa-users-gear"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-slate-800 tracking-tight">Kullanıcı & Şifre Yönetimi</h1>
+                    <p class="text-xs text-slate-500">Portala erişebilen operatör ve yönetici hesapları (Eşzamanlı 15+ kullanıcı destekli)</p>
+                </div>
+            </div>
+        </div>
+        <button onclick="openNewUserModal()"
+                class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-orange-600/20 transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Yeni Kullanıcı Ekle</span>
+        </button>
+    </div>
+
+    <!-- Eşzamanlı Kullanıcı & Altyapı Bilgi Kartı -->
+    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 p-4 rounded-2xl flex items-start space-x-3.5">
+        <div class="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+            <i class="fa-solid fa-network-wired text-sm"></i>
+        </div>
+        <div class="text-xs leading-relaxed text-slate-700">
+            <span class="font-bold text-orange-950 block text-sm mb-0.5">Çoklu Kullanıcı (15+ Eşzamanlı Erişim) Desteği Aktif</span>
+            Portala bağlı tüm operatörler ve yöneticiler kendi hesaplarıyla aynı anda sisteme giriş yapabilir.
+            Veritabanı <strong>SQLite WAL (Write-Ahead Logging)</strong> modunda ve bağlantı kuyruk korumasıyla çalıştığından,
+            eşzamanlı veri girişi, düzenleme ve rapor çekme işlemlerinde çakışma ve kilitlenme yaşanmaz.
+        </div>
+    </div>
+
+    <!-- İstatistik Kartları -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Toplam Hesap</div>
+            <div class="text-2xl font-black text-slate-800">{{ stats.total }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">{{ stats.active }} aktif kullanıcı</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-1">Yöneticiler (Admin)</div>
+            <div class="text-2xl font-black text-amber-600">{{ stats.admin_count }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Tam yetkili (DB & Kullanıcı)</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-orange-600 uppercase tracking-wider mb-1">Operatörler</div>
+            <div class="text-2xl font-black text-orange-600">{{ stats.operator_count }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Sadece Mutabakat Listesi & Kayıt</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">Gözetmenler</div>
+            <div class="text-2xl font-black text-indigo-600">{{ stats.gozetmen_count }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">Dashboard & Rapor (Salt Okunur)</div>
+        </div>
+    </div>
+
+    <!-- Kullanıcılar Tablosu -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-slate-50/60 border-b border-slate-200 flex items-center justify-between">
+            <div class="text-xs font-bold text-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-list text-slate-400"></i>
+                <span>Tanımlı Kullanıcı Listesi</span>
+            </div>
+            <div class="text-[11px] text-slate-500">
+                Toplam <strong>{{ users|length }}</strong> kullanıcı
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase text-[10px] tracking-wider">
+                        <th class="py-3.5 px-4">Kullanıcı Adı</th>
+                        <th class="py-3.5 px-4">Ad Soyad</th>
+                        <th class="py-3.5 px-4">Yetki Rolü</th>
+                        <th class="py-3.5 px-4">E-Posta</th>
+                        <th class="py-3.5 px-4">Durum</th>
+                        <th class="py-3.5 px-4">Kayıt Tarihi</th>
+                        <th class="py-3.5 px-4 text-right">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for u in users %}
+                    <tr class="hover:bg-slate-50/60 transition">
+                        <!-- Kullanıcı Adı -->
+                        <td class="py-3.5 px-4 font-mono font-bold text-slate-800">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="w-8 h-8 rounded-xl {% if u.role == 'admin' %}bg-amber-100 text-amber-700{% elif u.role == 'operator' %}bg-orange-100 text-orange-700{% else %}bg-indigo-100 text-indigo-700{% endif %} flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                    {{ u.username[:2].upper() }}
+                                </div>
+                                <div>
+                                    <span class="block text-slate-800">{{ u.username }}</span>
+                                    {% if u.id == current_user.id %}
+                                    <span class="text-[10px] font-sans font-semibold text-orange-600">(Siz)</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Ad Soyad -->
+                        <td class="py-3.5 px-4 font-semibold text-slate-700">{{ u.full_name }}</td>
+
+                        <!-- Yetki Rolü -->
+                        <td class="py-3.5 px-4">
+                            {% if u.role == 'admin' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                <i class="fa-solid fa-shield-halved text-[10px] text-amber-600"></i>
+                                Yönetici (Admin)
+                            </span>
+                            {% elif u.role == 'operator' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-100 text-orange-900 border border-orange-200">
+                                <i class="fa-solid fa-user-pen text-[10px] text-orange-600"></i>
+                                Operatör
+                            </span>
+                            {% elif u.role in ['gozetmen', 'reviewer'] %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">
+                                <i class="fa-solid fa-eye text-[10px] text-indigo-600"></i>
+                                Gözetmen (Salt Okunur)
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                                <i class="fa-solid fa-user text-[10px] text-slate-500"></i>
+                                {{ u.role }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- E-Posta -->
+                        <td class="py-3.5 px-4 text-slate-500 font-mono text-[11px]">{{ u.email or '-' }}</td>
+
+                        <!-- Durum -->
+                        <td class="py-3.5 px-4">
+                            {% if u.is_active %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span> Aktif
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span> Pasif
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Kayıt Tarihi -->
+                        <td class="py-3.5 px-4 text-slate-400 text-[11px]">
+                            {{ u.created_at[:10] if u.created_at else '-' }}
+                        </td>
+
+                        <!-- İşlemler -->
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="inline-flex items-center space-x-1.5">
+                                <!-- Şifre Değiştir Butonu -->
+                                <button type="button"
+                                        onclick="openResetPasswordModal({{ u.id }}, '{{ u.username }}', '{{ u.full_name }}')"
+                                        title="Şifre Değiştir"
+                                        class="px-2.5 py-1.5 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg font-semibold text-[11px] transition border border-slate-200 flex items-center gap-1">
+                                    <i class="fa-solid fa-key text-[10px] text-orange-500"></i>
+                                    <span>Şifre</span>
+                                </button>
+
+                                <!-- Aktif/Pasif Toggle -->
+                                {% if u.id != current_user.id %}
+                                <form action="/admin/users/{{ u.id }}/toggle-status" method="POST" class="inline"
+                                      onsubmit="return confirm('{{ u.username }} kullanıcısının durumunu değiştirmek istediğinize emin misiniz?');">
+                                    <button type="submit"
+                                            title="{% if u.is_active %}Hesabı Pasife Al{% else %}Hesabı Aktifleştir{% endif %}"
+                                            class="px-2.5 py-1.5 {% if u.is_active %}bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800{% else %}bg-emerald-50 hover:bg-emerald-100 text-emerald-700{% endif %} rounded-lg font-semibold text-[11px] transition border border-slate-200">
+                                        {% if u.is_active %}
+                                            <i class="fa-solid fa-ban text-[10px] text-amber-600"></i>
+                                            <span>Pasif Yap</span>
+                                        {% else %}
+                                            <i class="fa-solid fa-check text-[10px] text-emerald-600"></i>
+                                            <span>Aktif Yap</span>
+                                        {% endif %}
+                                    </button>
+                                </form>
+
+                                <!-- Silme Butonu -->
+                                <form action="/admin/users/{{ u.id }}/delete" method="POST" class="inline"
+                                      onsubmit="return confirm('{{ u.username }} kullanıcısını kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz!');">
+                                    <button type="submit"
+                                            title="Kullanıcıyı Sil"
+                                            class="p-1.5 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 rounded-lg transition border border-slate-200">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- YENİ KULLANICI MODALI -->
+<div id="newUserModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 transform transition-all">
+        <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-user-plus text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base">Yeni Kullanıcı Oluştur</h3>
+                    <p class="text-[11px] text-slate-400">Yeni operatör veya yönetici hesabı ekleyin</p>
+                </div>
+            </div>
+            <button onclick="closeNewUserModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <form action="/admin/users/new" method="POST" class="space-y-4 text-xs">
+            <!-- Kullanıcı Adı -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Kullanıcı Adı <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                    <i class="fa-solid fa-at absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="text" name="username" required minlength="3" placeholder="ornek: ahmet.yilmaz"
+                           class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono">
+                </div>
+                <span class="text-[10px] text-slate-400 mt-0.5 block">Giriş yaparken kullanılacak hesap adı (küçük harf, boşluksuz).</span>
+            </div>
+
+            <!-- Ad Soyad -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Ad Soyad <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                    <i class="fa-solid fa-id-card absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="text" name="full_name" required placeholder="ornek: Ahmet Yılmaz"
+                           class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-medium">
+                </div>
+            </div>
+
+            <!-- Şifre -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Başlangıç Şifresi <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                    <i class="fa-solid fa-lock absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="password" name="password" required minlength="4" placeholder="••••••••"
+                           class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                </div>
+                <span class="text-[10px] text-slate-400 mt-0.5 block">En az 4 karakter uzunluğunda olmalıdır.</span>
+            </div>
+
+            <!-- Rol / Yetki -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Yetki Rolü <span class="text-rose-500">*</span></label>
+                <select name="role" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-semibold text-slate-700">
+                    <option value="operator" selected>Operatör (Yalnızca Mutabakat Listesi ve Kayıt Düzenleme)</option>
+                    <option value="gozetmen">Gözetmen (Yalnızca Dashboard & Rapor Varyasyonları - Veri Giriş/Çıkışı Yok)</option>
+                    <option value="admin">Yönetici / Admin (Tam Yetkili - Veritabanı Düzeltme, Yükleme ve Kullanıcı Yönetimi)</option>
+                </select>
+            </div>
+
+            <!-- E-posta (Opsiyonel) -->
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">E-Posta Adresi (Opsiyonel)</label>
+                <div class="relative">
+                    <i class="fa-solid fa-envelope absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="email" name="email" placeholder="ahmet.yilmaz@teknosa.com"
+                           class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                </div>
+            </div>
+
+            <!-- Butonlar -->
+            <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                <button type="button" onclick="closeNewUserModal()"
+                        class="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-bold transition">
+                    İptal
+                </button>
+                <button type="submit"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-orange-600/20 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Kullanıcıyı Kaydet</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ŞİFRE DEĞİŞTİRME MODALI -->
+<div id="resetPasswordModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 transform transition-all">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-key text-xs"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm">Şifre Belirle / Değiştir</h3>
+                    <p id="resetModalSubtitle" class="text-[10px] text-slate-400"></p>
+                </div>
+            </div>
+            <button onclick="closeResetPasswordModal()" class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="resetPasswordForm" method="POST" class="space-y-4 text-xs">
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Yeni Şifre <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                    <i class="fa-solid fa-lock absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="password" name="new_password" required minlength="4" placeholder="Yeni şifreyi giriniz"
+                           class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500">
+                </div>
+                <span class="text-[10px] text-slate-400 mt-1 block">En az 4 karakter girilmelidir.</span>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeResetPasswordModal()"
+                        class="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-semibold transition">
+                    İptal
+                </button>
+                <button type="submit"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl font-bold shadow-md shadow-orange-600/20 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-save"></i>
+                    <span>Şifreyi Güncelle</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openNewUserModal() {
+        document.getElementById('newUserModal').classList.remove('hidden');
+    }
+    function closeNewUserModal() {
+        document.getElementById('newUserModal').classList.add('hidden');
+    }
+
+    function openResetPasswordModal(userId, username, fullName) {
+        document.getElementById('resetModalSubtitle').textContent = username + ' (' + fullName + ')';
+        document.getElementById('resetPasswordForm').action = '/admin/users/' + userId + '/reset-password';
+        document.getElementById('resetPasswordModal').classList.remove('hidden');
+    }
+    function closeResetPasswordModal() {
+        document.getElementById('resetPasswordModal').classList.add('hidden');
+    }
+
+    // Modal dışına veya ESC basıldığında kapat
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeNewUserModal();
+            closeResetPasswordModal();
+        }
+    });
+</script>
+{% endblock %}

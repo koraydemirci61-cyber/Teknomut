@@ -10,10 +10,12 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "teknosa_mutabakat.d
 
 def get_connection():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH), timeout=25.0)
+    conn = sqlite3.connect(str(DB_PATH), timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL") # Fast concurrent reads/writes
+    conn.execute("PRAGMA synchronous = NORMAL") # High throughput concurrent writes
+    conn.execute("PRAGMA busy_timeout = 30000") # 30s busy timeout for concurrent transactions
     return conn
 
 
@@ -127,11 +129,90 @@ def init_db():
     );
     """)
 
+    # Hasar & Fonksiyon Soru Maddeleri (Yönetici tarafından dinamik düzenlenebilir)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS inspection_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        device_group TEXT NOT NULL DEFAULT 'ALL', -- ALL, APPLE, ANDROID
+        question_type TEXT NOT NULL DEFAULT 'multi', -- bool, multi
+        options_json TEXT NOT NULL,
+        order_num INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # Varsayılan soru maddelerini ekle (eğer tablo boşsa)
+    cur.execute("SELECT COUNT(*) as count FROM inspection_questions")
+    if cur.fetchone()["count"] == 0:
+        import json
+        defaults = [
+            ("q1_working", "1. Cihaz çalışır durumdadır ve bataryası mevcuttur", "ALL", "bool", json.dumps([
+                {"val": "", "label": "Sorun Yok / Çalışıyor", "penalty": 0},
+                {"val": "Y", "label": "Çalışmıyor / Batarya Yok", "penalty": 100}
+            ], ensure_ascii=False), 1),
+            ("q2_btk", "2. Cihazın BTK sorgusu temizdir (Çalıntı, klon veya pasaport kayıtlı DEĞİL)", "ALL", "bool", json.dumps([
+                {"val": "", "label": "Temiz / Sorun Yok", "penalty": 0},
+                {"val": "Y", "label": "Sorunlu / Klon / Çalıntı", "penalty": 100}
+            ], ensure_ascii=False), 2),
+            ("q3_home_faceid", "3. Home tuşu, Parmak İzi veya Face ID çalışıyor mu?", "ALL", "bool", json.dumps([
+                {"val": "", "label": "Çalışıyor", "penalty": 0},
+                {"val": "Y", "label": "Çalışmıyor / Arızalı", "penalty": 40}
+            ], ensure_ascii=False), 3),
+            ("q4_icloud", "4. Cihaz sıfırlandı, iCloud / Google hesap kaldırıldı", "ALL", "bool", json.dumps([
+                {"val": "", "label": "Sıfırlandı / Kilit Açık", "penalty": 0},
+                {"val": "Y", "label": "Kilitli / Hesap Kaldırılmadı", "penalty": 70}
+            ], ensure_ascii=False), 4),
+            ("q5_apple_body", "5. (Apple) Kasa Durumu", "APPLE", "multi", json.dumps([
+                {"val": "", "label": "Temiz / Hasarsız", "penalty": 0},
+                {"val": "D", "label": "Çizik / Boya Soyulması", "penalty": 10},
+                {"val": "Y", "label": "Çatlak / Kırık / Kasa Açık", "penalty": 15}
+            ], ensure_ascii=False), 5),
+            ("q6_apple_screen", "6. (Apple) Ekran Durumu", "APPLE", "multi", json.dumps([
+                {"val": "", "label": "Kusursuz", "penalty": 0},
+                {"val": "D", "label": "Çizik", "penalty": 15},
+                {"val": "Y", "label": "Kırık / Leke / Sararma / Yanma / Bilinmeyen Parça", "penalty": 40}
+            ], ensure_ascii=False), 6),
+            ("q7_apple_camera", "7. (Apple) Kamera Durumu", "APPLE", "multi", json.dumps([
+                {"val": "", "label": "Temiz", "penalty": 0},
+                {"val": "D", "label": "Leke / Renk Değişimi", "penalty": 15},
+                {"val": "Y", "label": "Bilinmeyen Parça / Arızalı", "penalty": 25}
+            ], ensure_ascii=False), 7),
+            ("q8_apple_battery", "8. (Apple) Pil Durumu", "APPLE", "multi", json.dumps([
+                {"val": "", "label": "Sağlıklı (Pil >= %85)", "penalty": 0},
+                {"val": "D", "label": "Pil Sağlığı %85 Altında", "penalty": 15},
+                {"val": "Y", "label": "Bilinmeyen Parça / Şişik", "penalty": 25}
+            ], ensure_ascii=False), 8),
+            ("q5_android_camera", "5. (Android) Kamera Durumu", "ANDROID", "bool", json.dumps([
+                {"val": "", "label": "Leke / Kusur Yok", "penalty": 0},
+                {"val": "Y", "label": "Görüntüde Leke / Renk Değişimi Var", "penalty": 40}
+            ], ensure_ascii=False), 9),
+            ("q6_android_body", "6. (Android) Kasa Durumu", "ANDROID", "multi", json.dumps([
+                {"val": "", "label": "Temiz", "penalty": 0},
+                {"val": "D", "label": "Çizik / Boya Soyulması", "penalty": 15},
+                {"val": "Y", "label": "Çatlak / Kırık / Kasa Açık", "penalty": 20}
+            ], ensure_ascii=False), 10),
+            ("q7_android_screen", "7. (Android) Ekran Durumu", "ANDROID", "multi", json.dumps([
+                {"val": "", "label": "Kusursuz", "penalty": 0},
+                {"val": "D", "label": "Çizik", "penalty": 20},
+                {"val": "Y", "label": "Kırık / Leke / Sararma / Hayalet Ekran", "penalty": 40}
+            ], ensure_ascii=False), 11),
+        ]
+        cur.executemany("""
+        INSERT INTO inspection_questions (code, title, device_group, question_type, options_json, order_num)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, defaults)
+
     # Mevcut tabloya gerekirse sütun ekle
     cur.execute("PRAGMA table_info(mutabakat_records)")
     existing_cols = [r["name"] for r in cur.fetchall()]
     if "import_batch_id" not in existing_cols:
         cur.execute("ALTER TABLE mutabakat_records ADD COLUMN import_batch_id TEXT;")
+    if "updated_at" not in existing_cols:
+        cur.execute("ALTER TABLE mutabakat_records ADD COLUMN updated_at DATETIME;")
 
     cur.execute("CREATE INDEX IF NOT EXISTS idx_imei ON mutabakat_records(imei);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_store ON mutabakat_records(store_name);")

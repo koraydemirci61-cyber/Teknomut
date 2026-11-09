@@ -12,10 +12,28 @@
             <span>Mutabakat Listesine Dön</span>
         </a>
         <div class="flex items-center space-x-2">
-            <a href="/mutabakat/{{ record.id }}/edit" class="bg-orange-50 hover:bg-orange-100 text-orange-700 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+            {% if current_user.role in ['admin', 'operator'] %}
+            <a href="/mutabakat/{{ record.id }}/edit" class="bg-orange-50 hover:bg-orange-100 text-orange-700 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-orange-200">
                 <i class="fa-solid fa-pen-to-square"></i>
                 <span>Bilgileri Düzenle</span>
             </a>
+            {% else %}
+            <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-semibold border border-indigo-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-eye text-indigo-500"></i>
+                <span>Gözetmen İnceleme Modu</span>
+            </span>
+            {% endif %}
+
+            {% if current_user.role == 'admin' %}
+            <form action="/mutabakat/{{ record.id }}/delete" method="POST" class="inline"
+                  onsubmit="return confirm('Bu cihaz kaydını kalıcı olarak silmek istediğinize emin misiniz?');">
+                <button type="submit" class="bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-rose-200">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>Sil</span>
+                </button>
+            </form>
+            {% endif %}
+
             <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-2">
                 <i class="fa-solid fa-print"></i>
                 <span>Yazdır / PDF Kaydet</span>
@@ -109,20 +127,29 @@
             <div class="border border-slate-200 rounded-xl overflow-hidden text-xs">
                 <table class="w-full text-left">
                     <tbody class="divide-y divide-slate-100">
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">1. Cihaz çalışır durumda ve bataryası var mı?</td><td class="py-2 px-3 font-bold text-right">{{ 'YOK / ARIZALI (-100)' if record.q1_working == 'Y' else 'Sorun Yok' }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">2. BTK Sorgusu (Çalıntı/Klon/Pasaport)</td><td class="py-2 px-3 font-bold text-right">{{ 'SORUNLU (-100)' if record.q2_btk == 'Y' else 'Temiz' }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">3. Home Tuşu / Face ID / Parmak İzi</td><td class="py-2 px-3 font-bold text-right">{{ 'ÇALIŞMIYOR (-40)' if record.q3_home_faceid == 'Y' else 'Çalışıyor' }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">4. iCloud / Google Hesap Sıfırlama</td><td class="py-2 px-3 font-bold text-right">{{ 'KİLİTLİ (-70)' if record.q4_icloud == 'Y' else 'Sıfırlandı' }}</td></tr>
-                        {% if record.brand == 'APPLE' %}
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">5. Apple Kasa Durumu</td><td class="py-2 px-3 font-bold text-right">{{ 'Kırık/Çatlak (-15)' if record.q5_apple_body == 'Y' else ('Çizik (-10)' if record.q5_apple_body == 'D' else 'Temiz') }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">6. Apple Ekran Durumu</td><td class="py-2 px-3 font-bold text-right">{{ 'Kırık/Bilinmeyen (-40)' if record.q6_apple_screen == 'Y' else ('Çizik (-15)' if record.q6_apple_screen == 'D' else 'Kusursuz') }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">7. Apple Kamera Durumu</td><td class="py-2 px-3 font-bold text-right">{{ 'Bilinmeyen Parça (-25)' if record.q7_apple_camera == 'Y' else ('Leke/Renk (-15)' if record.q7_apple_camera == 'D' else 'Temiz') }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">8. Apple Pil Sağlığı</td><td class="py-2 px-3 font-bold text-right">{{ 'Bilinmeyen/Şişik (-25)' if record.q8_apple_battery == 'Y' else ('%85 Altında (-15)' if record.q8_apple_battery == 'D' else 'Sağlıklı') }}</td></tr>
-                        {% else %}
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">5. Android Kamera Durumu</td><td class="py-2 px-3 font-bold text-right">{{ 'Leke/Renk Değişimi (-40)' if record.q5_android_camera == 'Y' else 'Temiz' }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">6. Android Kasa Durumu</td><td class="py-2 px-3 font-bold text-right">{{ 'Kırık/Açık (-20)' if record.q6_android_body == 'Y' else ('Çizik (-15)' if record.q6_android_body == 'D' else 'Temiz') }}</td></tr>
-                        <tr class="p-2"><td class="py-2 px-3 text-slate-500">7. Android Ekran Durumu</td><td class="py-2 px-3 font-bold text-right">{{ 'Kırık/Yanma (-40)' if record.q7_android_screen == 'Y' else ('Çizik (-20)' if record.q7_android_screen == 'D' else 'Kusursuz') }}</td></tr>
+                        {% for q in questions %}
+                        {% if q.device_group == 'ALL' or (record.brand == 'APPLE' and q.device_group == 'APPLE') or (record.brand != 'APPLE' and q.device_group == 'ANDROID') %}
+                        <tr class="p-2">
+                            <td class="py-2 px-3 text-slate-500">{{ q.title }}</td>
+                            <td class="py-2 px-3 font-bold text-right">
+                                {% set user_val = record[q.code or q.id] %}
+                                {% set ns = namespace(found=false) %}
+                                {% for opt in q.options %}
+                                    {% if opt.val == user_val %}
+                                        {% set ns.found = true %}
+                                        <span>{{ opt.label }}</span>
+                                        {% if opt.penalty and opt.penalty > 0 %}
+                                        <span class="text-rose-600 font-mono font-bold ml-1">(-%{{ opt.penalty|int }})</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not ns.found %}
+                                    <span class="text-slate-400">Sorun Yok / Belirtilmemiş</span>
+                                {% endif %}
+                            </td>
+                        </tr>
                         {% endif %}
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>

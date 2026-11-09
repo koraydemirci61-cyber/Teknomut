@@ -11,7 +11,22 @@
   - **Toplu Seri / IMEI Silme Sayfası (`/admin/bulk-delete`)**:
     - Metin kutusuna yapıştırılan IMEI'leri bulup önizleme ve kalıcı olarak silme.
     - Geçmiş aktarım paketlerini listeleme ve istenen paketi tamamen geri alma/silme.
-  - Rol bazlı yetkilendirme (Admin / Operatör).
+  - **Kullanıcı & Şifre Yönetimi Paneli (`/admin/users`)**:
+    - Aynı anda 15+ kullanıcının eşzamanlı erişimini destekleyen SQLite WAL ve bağlantı havuzu optimizasyonu.
+    - Yöneticiler için yeni kullanıcı oluşturma (kullanıcı adı, şifre, rol, e-posta).
+    - Her kullanıcı için anında şifre sıfırlama / güncelleme.
+    - Kullanıcı hesabı pasife alma / aktifleştirme ve güvenli silme.
+    - Üst menüde Admin'e özel "Kullanıcılar" sekmesi.
+  - **Hasar & Fonksiyon Soru Kriterleri ve Ceza Puanı Yönetimi (`/admin/questions`)**:
+    - Yöneticiler için yeni kontrol maddesi ekleme, maddeleri düzenleme, çıkartma (pasife alma) ve aktifleştirme.
+    - Her sorunun cevap seçeneklerine göre %lik ceza kesinti puanlarını (örn: -%10, -%15, -%40) anında güncelleyebilme.
+    - **Kapsam Seçimi**: Değişiklik yapılırken "Sadece bundan sonraki yeni/düzeltilecek kayıtlar için mi" yoksa "Tüm veritabanındaki 8.700+ cihaz için mi" geçerli olacağını soran onay mekanizması ve iptal seçeneği.
+    - Cihaz giriş/düzenleme formunda ve fiş dökümünde dinamik soru ve canlı JavaScript puan hesaplama entegrasyonu.
+  - **3 Seviyeli Rol & Yetkilendirme Sistemi (Admin, Operatör, Gözetmen)**:
+    - **Yönetici (Admin)**: Veritabanında tam yetkili düzeltme/güncelleme, dosya yükleme, toplu silme, kullanıcı/şifre yönetimi ve Excel dışa aktarımı.
+    - **Operatör**: Girişte doğrudan Mutabakat Listesi ekranı açılır (`/mutabakat`); yalnızca kayıtları inceleme, filtreleme ve cihaz/soru düzenleme yetkisine sahiptir.
+    - **Gözetmen**: Veri giriş/çıkışı yapamaz (Excel indirme, düzenleme, silme ve veri ekleme engellidir); girişte doğrudan Dashboard'u açarak tüm rapor varyasyonlarını (Mağaza/Temsilci/Model sekmeleri, Adet/Tutar/Fark sıralamaları) inceler.
+  - Rol bazlı yetkilendirme (Admin / Operatör / Gözetmen).
   - Dashboard & Raporlama Merkezi:
     - **Silinen / Boş IMEI Otomatik Temizleme (Purge)**: IMEI'si silinen ya da boşaltılan tüm satırların veritabanından kalıcı olarak silinmesi garantilendi (SQLite Triggers ve `WHERE imei IS NOT NULL AND TRIM(imei) != ''` filtreleri). Hiçbir raporda veya göstergede yer alamaz.
     - **Canlı Veritabanı Senkronizasyonu**: Önbellek engelleme başlıkları (`no-cache, no-store`) ve tek tıkla **"Raporu Yenile"** canlı güncelleme butonu.

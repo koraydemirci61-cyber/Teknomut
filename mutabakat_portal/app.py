@@ -18,10 +18,22 @@ from .services.auth import (
     create_session,
     get_current_user_from_token,
     remove_session,
-    hash_password
+    hash_password,
+    get_all_users,
+    get_user_by_id,
+    create_user,
+    update_user_password,
+    toggle_user_status,
+    delete_user
 )
 from .services.calculator import (
     QUESTIONS_DEF,
+    get_all_questions,
+    get_question_by_id,
+    add_question,
+    update_question,
+    toggle_question_status,
+    delete_question,
     calculate_penalty_points,
     calculate_valuation
 )
@@ -62,6 +74,13 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
     return get_current_user_from_token(token)
 
 
+def get_user_home_url(role: Optional[str]) -> str:
+    """Rol bazlı açılış ekranı: Operatör doğrudan Mutabakat Listesi'ne, Admin/Gözetmen Dashboard'a."""
+    if role == "operator":
+        return "/mutabakat"
+    return "/dashboard"
+
+
 # ----------------------------------------------------
 # OTURUM AÇMA / KAPATMA ROTLARI
 # ----------------------------------------------------
@@ -70,7 +89,7 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
 def index(request: Request):
     user = get_current_user(request)
     if user:
-        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=get_user_home_url(user.get("role")), status_code=status.HTTP_302_FOUND)
     return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 
@@ -78,7 +97,7 @@ def index(request: Request):
 def login_page(request: Request, error: Optional[str] = None):
     user = get_current_user(request)
     if user:
-        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=get_user_home_url(user.get("role")), status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(request=request, name="login.html", context={
         "error": error,
         "current_user": None
@@ -100,7 +119,8 @@ def login_action(
         }, status_code=400)
 
     token = create_session(user["id"])
-    redirect = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+    target_url = get_user_home_url(user.get("role"))
+    redirect = RedirectResponse(url=target_url, status_code=status.HTTP_302_FOUND)
     redirect.set_cookie(
         key="session_token",
         value=token,
@@ -143,6 +163,13 @@ def dashboard_view(
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login")
+
+    # Operatör yetkisi: Sadece Mutabakat Listesi ekranına erişebilir
+    if user.get("role") == "operator":
+        return RedirectResponse(
+            url="/mutabakat?msg=Operatör+hesapları+yalnızca+Mutabakat+Listesi+ve+cihaz+düzenleme+ekranına+erişebilir&msg_type=error",
+            status_code=302
+        )
 
     # Tarayıcı önbelleğini engelle (Her tıklandığında taze canlı veritabanı sorgusu)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -571,6 +598,8 @@ def new_mutabakat_view(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login")
+    if user.get("role") == "gozetmen":
+        return RedirectResponse(url="/dashboard?msg=Gözetmen+hesabı+veri+girişi+yapamaz&msg_type=error", status_code=status.HTTP_302_FOUND)
 
     models = query_all("SELECT model_name, full_price FROM model_prices ORDER BY model_name ASC")
 
@@ -579,48 +608,46 @@ def new_mutabakat_view(request: Request):
         "active_page": "new",
         "is_edit": False,
         "record": {},
-        "questions": QUESTIONS_DEF,
+        "questions": get_all_questions(include_inactive=False),
         "model_list": models,
         "today_str": date.today().strftime("%Y-%m-%d")
     })
 
 
 @app.post("/mutabakat/new")
-def create_mutabakat_action(
-    request: Request,
-    customer_name: str = Form(...),
-    tc_no: str = Form(""),
-    phone: str = Form(""),
-    store_name: str = Form(...),
-    process_user: str = Form(""),
-    process_start_date: str = Form(""),
-    imei: str = Form(...),
-    brand: str = Form(...),
-    model: str = Form(...),
-    full_price: float = Form(0.0),
-    voucher_amount: float = Form(0.0),
-    voucher_no: str = Form(""),
-    reconciliation_status: str = Form("Cevap bekleniyor"),
-    screen_original: str = Form(""),
-    camera_original: str = Form(""),
-    battery_original: str = Form(""),
-    notes: str = Form(""),
-    # Sorular:
-    q1_working: str = Form(""),
-    q2_btk: str = Form(""),
-    q3_home_faceid: str = Form(""),
-    q4_icloud: str = Form(""),
-    q5_apple_body: str = Form(""),
-    q6_apple_screen: str = Form(""),
-    q7_apple_camera: str = Form(""),
-    q8_apple_battery: str = Form(""),
-    q5_android_camera: str = Form(""),
-    q6_android_body: str = Form(""),
-    q7_android_screen: str = Form("")
+async def create_mutabakat_action(
+    request: Request
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login")
+    if user.get("role") == "gozetmen":
+        return RedirectResponse(url="/dashboard?msg=Gözetmen+hesabı+veri+girişi+yapamaz&msg_type=error", status_code=status.HTTP_302_FOUND)
+
+    form_data = await request.form()
+    customer_name = str(form_data.get("customer_name", "")).strip()
+    tc_no = str(form_data.get("tc_no", "")).strip()
+    phone = str(form_data.get("phone", "")).strip()
+    store_name = str(form_data.get("store_name", "")).strip()
+    process_user = str(form_data.get("process_user", "")).strip() or user["full_name"]
+    process_start_date = str(form_data.get("process_start_date", "")).strip() or date.today().strftime("%Y-%m-%d")
+    imei = str(form_data.get("imei", "")).strip()
+    brand = str(form_data.get("brand", "")).strip()
+    model = str(form_data.get("model", "")).strip()
+    try:
+        full_price = float(form_data.get("full_price", 0.0) or 0.0)
+    except Exception:
+        full_price = 0.0
+    try:
+        voucher_amount = float(form_data.get("voucher_amount", 0.0) or 0.0)
+    except Exception:
+        voucher_amount = 0.0
+    voucher_no = str(form_data.get("voucher_no", "")).strip()
+    reconciliation_status = str(form_data.get("reconciliation_status", "Cevap bekleniyor")).strip()
+    screen_original = str(form_data.get("screen_original", "")).strip()
+    camera_original = str(form_data.get("camera_original", "")).strip()
+    battery_original = str(form_data.get("battery_original", "")).strip()
+    notes = str(form_data.get("notes", "")).strip()
 
     clean_imei = imei.strip()
     
@@ -628,55 +655,51 @@ def create_mutabakat_action(
     existing_imei = query_one("SELECT COUNT(*) as c FROM mutabakat_records WHERE imei = ?", (clean_imei,))
     is_duplicate = 1 if (existing_imei and existing_imei["c"] > 0) else 0
 
-    answers = {
-        "q1_working": q1_working,
-        "q2_btk": q2_btk,
-        "q3_home_faceid": q3_home_faceid,
-        "q4_icloud": q4_icloud,
-        "q5_apple_body": q5_apple_body,
-        "q6_apple_screen": q6_apple_screen,
-        "q7_apple_camera": q7_apple_camera,
-        "q8_apple_battery": q8_apple_battery,
-        "q5_android_camera": q5_android_camera,
-        "q6_android_body": q6_android_body,
-        "q7_android_screen": q7_android_screen
-    }
+    active_questions = get_all_questions(include_inactive=False)
+    answers = {}
+    for q in active_questions:
+        q_code = q.get("code") or q.get("id")
+        answers[q_code] = str(form_data.get(q_code, "")).strip()
 
-    penalty = calculate_penalty_points(answers)
+    penalty = calculate_penalty_points(answers, questions=active_questions, brand=brand)
     calculated_price, diff_amount = calculate_valuation(full_price, penalty, voucher_amount)
 
-    rec_id = execute_db("""
-    INSERT INTO mutabakat_records (
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(mutabakat_records)")
+    existing_cols = set(r["name"] for r in cur.fetchall())
+
+    cols = [
+        "customer_name", "tc_no", "phone", "store_name", "process_user", "process_start_date",
+        "imei", "is_duplicate", "brand", "model", "full_price", "voucher_amount", "voucher_no",
+        "reconciliation_status", "screen_original", "camera_original", "battery_original", "notes",
+        "penalty_points", "calculated_price", "difference_amount"
+    ]
+    vals = [
         customer_name, tc_no, phone, store_name, process_user, process_start_date,
-        imei, is_duplicate, brand, model, full_price, voucher_amount, voucher_no,
+        clean_imei, is_duplicate, brand, model, full_price, voucher_amount, voucher_no,
         reconciliation_status, screen_original, camera_original, battery_original, notes,
-        q1_working, q2_btk, q3_home_faceid, q4_icloud,
-        q5_apple_body, q6_apple_screen, q7_apple_camera, q8_apple_battery,
-        q5_android_camera, q6_android_body, q7_android_screen,
-        penalty_points, calculated_price, difference_amount
-    ) VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?
-    )
-    """, (
-        customer_name.strip(), tc_no.strip(), phone.strip(), store_name.strip(),
-        process_user.strip() or user["full_name"], process_start_date or date.today().strftime("%Y-%m-%d"),
-        clean_imei, is_duplicate, brand.strip(), model.strip(), full_price, voucher_amount, voucher_no.strip(),
-        reconciliation_status, screen_original, camera_original, battery_original, notes.strip(),
-        q1_working, q2_btk, q3_home_faceid, q4_icloud,
-        q5_apple_body, q6_apple_screen, q7_apple_camera, q8_apple_battery,
-        q5_android_camera, q6_android_body, q7_android_screen,
         penalty, calculated_price, diff_amount
-    ))
+    ]
+
+    for q_code, q_ans in answers.items():
+        if q_code not in existing_cols:
+            cur.execute(f"ALTER TABLE mutabakat_records ADD COLUMN {q_code} TEXT;")
+            existing_cols.add(q_code)
+        cols.append(q_code)
+        vals.append(q_ans)
+
+    placeholders = ",".join(["?"] * len(cols))
+    sql = f"INSERT INTO mutabakat_records ({','.join(cols)}) VALUES ({placeholders})"
+    cur.execute(sql, tuple(vals))
+    rec_id = cur.lastrowid
 
     # Daha önce girilmiş aynı IMEI'leri de çift adet olarak güncelle
     if is_duplicate:
-        execute_db("UPDATE mutabakat_records SET is_duplicate = 1 WHERE imei = ?", (clean_imei,))
+        cur.execute("UPDATE mutabakat_records SET is_duplicate = 1 WHERE imei = ?", (clean_imei,))
+
+    conn.commit()
+    conn.close()
 
     return RedirectResponse(
         url=f"/mutabakat/{rec_id}?msg=Yeni+cihaz+kaydedildi+(Hakediş:+{calculated_price:,.2f}+₺)",
@@ -702,6 +725,7 @@ def mutabakat_detail_view(request: Request, record_id: int, msg: Optional[str] =
         "current_user": user,
         "active_page": "mutabakat",
         "record": rec,
+        "questions": get_all_questions(include_inactive=True),
         "today_str": date.today().strftime("%d.%m.%Y"),
         "message": msg
     })
@@ -716,6 +740,8 @@ def edit_mutabakat_view(request: Request, record_id: int):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login")
+    if user.get("role") == "gozetmen":
+        return RedirectResponse(url=f"/mutabakat/{record_id}?msg=Gözetmen+hesabı+salt+okunurdur,+veri+düzenleme+veya+girişi+yapamaz&msg_type=error", status_code=status.HTTP_302_FOUND)
 
     rec = query_one("SELECT * FROM mutabakat_records WHERE id = ?", (record_id,))
     if not rec:
@@ -728,49 +754,47 @@ def edit_mutabakat_view(request: Request, record_id: int):
         "active_page": "mutabakat",
         "is_edit": True,
         "record": rec,
-        "questions": QUESTIONS_DEF,
+        "questions": get_all_questions(include_inactive=False),
         "model_list": models,
         "today_str": date.today().strftime("%Y-%m-%d")
     })
 
 
 @app.post("/mutabakat/{record_id}/edit")
-def update_mutabakat_action(
+async def update_mutabakat_action(
     request: Request,
-    record_id: int,
-    customer_name: str = Form(""),
-    tc_no: str = Form(""),
-    phone: str = Form(""),
-    store_name: str = Form(""),
-    process_user: str = Form(""),
-    process_start_date: str = Form(""),
-    imei: str = Form(""),
-    brand: str = Form(""),
-    model: str = Form(""),
-    full_price: float = Form(0.0),
-    voucher_amount: float = Form(0.0),
-    voucher_no: str = Form(""),
-    reconciliation_status: str = Form("Cevap bekleniyor"),
-    screen_original: str = Form(""),
-    camera_original: str = Form(""),
-    battery_original: str = Form(""),
-    notes: str = Form(""),
-    # Sorular:
-    q1_working: str = Form(""),
-    q2_btk: str = Form(""),
-    q3_home_faceid: str = Form(""),
-    q4_icloud: str = Form(""),
-    q5_apple_body: str = Form(""),
-    q6_apple_screen: str = Form(""),
-    q7_apple_camera: str = Form(""),
-    q8_apple_battery: str = Form(""),
-    q5_android_camera: str = Form(""),
-    q6_android_body: str = Form(""),
-    q7_android_screen: str = Form("")
+    record_id: int
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login")
+    if user.get("role") == "gozetmen":
+        return RedirectResponse(url=f"/mutabakat/{record_id}?msg=Gözetmen+hesabı+salt+okunurdur,+veri+düzenleme+veya+girişi+yapamaz&msg_type=error", status_code=status.HTTP_302_FOUND)
+
+    form_data = await request.form()
+    customer_name = str(form_data.get("customer_name", "")).strip()
+    tc_no = str(form_data.get("tc_no", "")).strip()
+    phone = str(form_data.get("phone", "")).strip()
+    store_name = str(form_data.get("store_name", "")).strip()
+    process_user = str(form_data.get("process_user", "")).strip()
+    process_start_date = str(form_data.get("process_start_date", "")).strip()
+    imei = str(form_data.get("imei", "")).strip()
+    brand = str(form_data.get("brand", "")).strip()
+    model = str(form_data.get("model", "")).strip()
+    try:
+        full_price = float(form_data.get("full_price", 0.0) or 0.0)
+    except Exception:
+        full_price = 0.0
+    try:
+        voucher_amount = float(form_data.get("voucher_amount", 0.0) or 0.0)
+    except Exception:
+        voucher_amount = 0.0
+    voucher_no = str(form_data.get("voucher_no", "")).strip()
+    reconciliation_status = str(form_data.get("reconciliation_status", "Cevap bekleniyor")).strip()
+    screen_original = str(form_data.get("screen_original", "")).strip()
+    camera_original = str(form_data.get("camera_original", "")).strip()
+    battery_original = str(form_data.get("battery_original", "")).strip()
+    notes = str(form_data.get("notes", "")).strip()
 
     clean_imei = imei.strip()
 
@@ -782,45 +806,48 @@ def update_mutabakat_action(
             status_code=status.HTTP_302_FOUND
         )
 
-    answers = {
-        "q1_working": q1_working,
-        "q2_btk": q2_btk,
-        "q3_home_faceid": q3_home_faceid,
-        "q4_icloud": q4_icloud,
-        "q5_apple_body": q5_apple_body,
-        "q6_apple_screen": q6_apple_screen,
-        "q7_apple_camera": q7_apple_camera,
-        "q8_apple_battery": q8_apple_battery,
-        "q5_android_camera": q5_android_camera,
-        "q6_android_body": q6_android_body,
-        "q7_android_screen": q7_android_screen
-    }
+    active_questions = get_all_questions(include_inactive=False)
+    answers = {}
+    for q in active_questions:
+        q_code = q.get("code") or q.get("id")
+        answers[q_code] = str(form_data.get(q_code, "")).strip()
 
-    penalty = calculate_penalty_points(answers)
+    penalty = calculate_penalty_points(answers, questions=active_questions, brand=brand)
     calculated_price, diff_amount = calculate_valuation(full_price, penalty, voucher_amount)
 
-    execute_db("""
-    UPDATE mutabakat_records SET
-        customer_name = ?, tc_no = ?, phone = ?, store_name = ?, process_user = ?, process_start_date = ?,
-        imei = ?, brand = ?, model = ?, full_price = ?, voucher_amount = ?, voucher_no = ?,
-        reconciliation_status = ?, screen_original = ?, camera_original = ?, battery_original = ?, notes = ?,
-        q1_working = ?, q2_btk = ?, q3_home_faceid = ?, q4_icloud = ?,
-        q5_apple_body = ?, q6_apple_screen = ?, q7_apple_camera = ?, q8_apple_battery = ?,
-        q5_android_camera = ?, q6_android_body = ?, q7_android_screen = ?,
-        penalty_points = ?, calculated_price = ?, difference_amount = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-    """, (
-        customer_name.strip(), tc_no.strip(), phone.strip(), store_name.strip(), process_user.strip(), process_start_date,
-        clean_imei, brand.strip(), model.strip(), full_price, voucher_amount, voucher_no.strip(),
-        reconciliation_status, screen_original, camera_original, battery_original, notes.strip(),
-        q1_working, q2_btk, q3_home_faceid, q4_icloud,
-        q5_apple_body, q6_apple_screen, q7_apple_camera, q8_apple_battery,
-        q5_android_camera, q6_android_body, q7_android_screen,
-        penalty, calculated_price, diff_amount, record_id
-    ))
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(mutabakat_records)")
+    existing_cols = set(r["name"] for r in cur.fetchall())
+
+    update_clauses = [
+        "customer_name = ?", "tc_no = ?", "phone = ?", "store_name = ?", "process_user = ?", "process_start_date = ?",
+        "imei = ?", "brand = ?", "model = ?", "full_price = ?", "voucher_amount = ?", "voucher_no = ?",
+        "reconciliation_status = ?", "screen_original = ?", "camera_original = ?", "battery_original = ?", "notes = ?",
+        "penalty_points = ?", "calculated_price = ?", "difference_amount = ?", "updated_at = CURRENT_TIMESTAMP"
+    ]
+    update_vals = [
+        customer_name, tc_no, phone, store_name, process_user, process_start_date,
+        clean_imei, brand, model, full_price, voucher_amount, voucher_no,
+        reconciliation_status, screen_original, camera_original, battery_original, notes,
+        penalty, calculated_price, diff_amount
+    ]
+
+    for q_code, q_ans in answers.items():
+        if q_code not in existing_cols:
+            cur.execute(f"ALTER TABLE mutabakat_records ADD COLUMN {q_code} TEXT;")
+            existing_cols.add(q_code)
+        update_clauses.append(f"{q_code} = ?")
+        update_vals.append(q_ans)
+
+    update_vals.append(record_id)
+    sql = f"UPDATE mutabakat_records SET {','.join(update_clauses)} WHERE id = ?"
+    cur.execute(sql, tuple(update_vals))
+    conn.commit()
+    conn.close()
 
     return RedirectResponse(
-        url=f"/mutabakat/{record_id}?msg=Kayıt+başarıyla+güncellendi",
+        url=f"/mutabakat/{record_id}?msg=Kayıt+başarıyla+güncellendi+(Hakediş:+{calculated_price:,.2f}+₺)",
         status_code=status.HTTP_302_FOUND
     )
 
@@ -830,6 +857,8 @@ def delete_mutabakat_action(request: Request, record_id: int):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login")
+    if user.get("role") != "admin":
+        return RedirectResponse(url=f"/mutabakat/{record_id}?msg=Kayıt+silme+yetkisi+yalnızca+Yöneticidedir&msg_type=error", status_code=status.HTTP_302_FOUND)
 
     execute_db("DELETE FROM mutabakat_records WHERE id = ?", (record_id,))
     return RedirectResponse(url="/mutabakat?msg=Kayıt+silindi", status_code=status.HTTP_302_FOUND)
@@ -1176,6 +1205,14 @@ def export_excel_action(
     if not user:
         return RedirectResponse(url="/login")
 
+    # Veri çıkışı / Excel indirme yetkisi yalnızca Yöneticidedir
+    if user.get("role") != "admin":
+        redirect_target = "/mutabakat" if user.get("role") == "operator" else "/dashboard"
+        return RedirectResponse(
+            url=f"{redirect_target}?msg=Excel+dışa+aktarma+yetkisi+yalnızca+Yöneticidedir&msg_type=error",
+            status_code=302
+        )
+
     today = date.today()
     period_label = "Tüm Zamanlar"
 
@@ -1217,3 +1254,320 @@ def export_excel_action(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers
     )
+
+
+# ----------------------------------------------------
+# ADMIN KULLANICI & ŞİFRE YÖNETİMİ (15+ KULLANICI DESTEĞİ)
+# ----------------------------------------------------
+
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users_page(
+    request: Request,
+    msg: Optional[str] = None,
+    msg_type: str = "success"
+):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login")
+    if user["role"] != "admin":
+        redirect_target = "/mutabakat" if user.get("role") == "operator" else "/dashboard"
+        return RedirectResponse(
+            url=f"{redirect_target}?msg=Bu+alana+yalnızca+yöneticiler+erişebilir&msg_type=error",
+            status_code=302
+        )
+
+    all_users = get_all_users()
+    stats = {
+        "total": len(all_users),
+        "active": sum(1 for u in all_users if u.get("is_active")),
+        "admin_count": sum(1 for u in all_users if u.get("role") == "admin"),
+        "operator_count": sum(1 for u in all_users if u.get("role") == "operator"),
+        "gozetmen_count": sum(1 for u in all_users if u.get("role") in ["gozetmen", "reviewer"])
+    }
+
+    return templates.TemplateResponse(request=request, name="users.html", context={
+        "current_user": user,
+        "active_page": "users",
+        "users": all_users,
+        "stats": stats,
+        "message": msg,
+        "message_type": msg_type
+    })
+
+
+@app.post("/admin/users/new")
+def admin_create_user_action(
+    request: Request,
+    username: str = Form(...),
+    full_name: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("operator"),
+    email: Optional[str] = Form(None)
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login")
+
+    res = create_user(
+        username=username,
+        password=password,
+        full_name=full_name,
+        role=role,
+        email=email
+    )
+
+    msg_type = "success" if res.get("success") else "error"
+    msg_text = res.get("message") if res.get("success") else res.get("error")
+    return RedirectResponse(url=f"/admin/users?msg={msg_text}&msg_type={msg_type}", status_code=status.HTTP_302_FOUND)
+
+
+@app.post("/admin/users/{user_id}/reset-password")
+def admin_reset_password_action(
+    request: Request,
+    user_id: int,
+    new_password: str = Form(...)
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login")
+
+    res = update_user_password(user_id=user_id, new_password=new_password)
+    msg_type = "success" if res.get("success") else "error"
+    msg_text = res.get("message") if res.get("success") else res.get("error")
+    return RedirectResponse(url=f"/admin/users?msg={msg_text}&msg_type={msg_type}", status_code=status.HTTP_302_FOUND)
+
+
+@app.post("/admin/users/{user_id}/toggle-status")
+def admin_toggle_user_status_action(
+    request: Request,
+    user_id: int
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login")
+
+    res = toggle_user_status(user_id=user_id, current_admin_id=user["id"])
+    msg_type = "success" if res.get("success") else "error"
+    msg_text = res.get("message") if res.get("success") else res.get("error")
+    return RedirectResponse(url=f"/admin/users?msg={msg_text}&msg_type={msg_type}", status_code=status.HTTP_302_FOUND)
+
+
+@app.post("/admin/users/{user_id}/delete")
+def admin_delete_user_action(
+    request: Request,
+    user_id: int
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login")
+
+    res = delete_user(user_id=user_id, current_admin_id=user["id"])
+    msg_type = "success" if res.get("success") else "error"
+    msg_text = res.get("message") if res.get("success") else res.get("error")
+    return RedirectResponse(url=f"/admin/users?msg={msg_text}&msg_type={msg_type}", status_code=status.HTTP_302_FOUND)
+
+
+# ----------------------------------------------------
+# ADMIN HASAR & FONKSİYON SORU MADDELERİ YÖNETİMİ
+# ----------------------------------------------------
+
+@app.get("/admin/questions", response_class=HTMLResponse)
+def admin_questions_page(
+    request: Request,
+    msg: Optional[str] = None,
+    msg_type: str = "success"
+):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login")
+    if user["role"] != "admin":
+        return RedirectResponse(url="/dashboard?msg=Bu+alana+yalnızca+yöneticiler+erişebilir&msg_type=error", status_code=302)
+
+    all_questions = get_all_questions(include_inactive=True)
+    stats = {
+        "total": len(all_questions),
+        "active": sum(1 for q in all_questions if q.get("is_active")),
+        "apple_count": sum(1 for q in all_questions if q.get("device_group") == "APPLE"),
+        "android_count": sum(1 for q in all_questions if q.get("device_group") == "ANDROID"),
+    }
+
+    return templates.TemplateResponse(request=request, name="questions.html", context={
+        "current_user": user,
+        "active_page": "questions",
+        "questions": all_questions,
+        "stats": stats,
+        "message": msg,
+        "message_type": msg_type
+    })
+
+
+@app.post("/admin/questions/new")
+async def admin_create_question_action(
+    request: Request
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login", status_code=302)
+
+    form_data = await request.form()
+    title = str(form_data.get("title", "")).strip()
+    code = str(form_data.get("code", "")).strip()
+    device_group = str(form_data.get("device_group", "ALL")).strip().upper()
+    try:
+        order_num = int(form_data.get("order_num", 0) or 0)
+    except Exception:
+        order_num = 0
+    apply_scope = str(form_data.get("apply_scope", "future")).strip()
+
+    labels = form_data.getlist("opt_label")
+    vals = form_data.getlist("opt_val")
+    penalties = form_data.getlist("opt_penalty")
+
+    options = []
+    for l, v, p in zip(labels, vals, penalties):
+        l_clean = str(l).strip()
+        if not l_clean:
+            continue
+        try:
+            p_val = float(p)
+        except Exception:
+            p_val = 0.0
+        options.append({
+            "val": str(v).strip(),
+            "label": l_clean,
+            "penalty": p_val
+        })
+
+    if not options:
+        options = [
+            {"val": "", "label": "Sorun Yok", "penalty": 0},
+            {"val": "Y", "label": "Arızalı", "penalty": 20}
+        ]
+
+    res = add_question(
+        title=title,
+        device_group=device_group,
+        options=options,
+        code=code,
+        order_num=order_num
+    )
+
+    if not res.get("success"):
+        return RedirectResponse(url=f"/admin/questions?msg={res.get('error')}&msg_type=error", status_code=302)
+
+    if apply_scope == "all":
+        recalc_res = recalculate_all_records()
+        recalc_count = recalc_res.get("updated_count", 0)
+        msg = f"'{title}' soru maddesi eklendi ve tüm veritabanındaki ({recalc_count:,} adet) kayıt başarıyla yeniden hesaplandı."
+    else:
+        msg = f"'{title}' soru maddesi eklendi. Değişiklik bundan sonraki yeni ve düzeltilecek kayıtlar için geçerli olacaktır (Geçmiş kayıtlar korundu)."
+
+    return RedirectResponse(url=f"/admin/questions?msg={msg}&msg_type=success", status_code=302)
+
+
+@app.post("/admin/questions/{question_id}/edit")
+async def admin_edit_question_action(
+    request: Request,
+    question_id: int
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login", status_code=302)
+
+    form_data = await request.form()
+    title = str(form_data.get("title", "")).strip()
+    device_group = str(form_data.get("device_group", "ALL")).strip().upper()
+    try:
+        order_num = int(form_data.get("order_num", 0) or 0)
+    except Exception:
+        order_num = 0
+    apply_scope = str(form_data.get("apply_scope", "future")).strip()
+
+    labels = form_data.getlist("opt_label")
+    vals = form_data.getlist("opt_val")
+    penalties = form_data.getlist("opt_penalty")
+
+    options = []
+    for l, v, p in zip(labels, vals, penalties):
+        l_clean = str(l).strip()
+        if not l_clean:
+            continue
+        try:
+            p_val = float(p)
+        except Exception:
+            p_val = 0.0
+        options.append({
+            "val": str(v).strip(),
+            "label": l_clean,
+            "penalty": p_val
+        })
+
+    res = update_question(
+        question_id=question_id,
+        title=title,
+        device_group=device_group,
+        options=options,
+        order_num=order_num
+    )
+
+    if not res.get("success"):
+        return RedirectResponse(url=f"/admin/questions?msg={res.get('error')}&msg_type=error", status_code=302)
+
+    if apply_scope == "all":
+        recalc_res = recalculate_all_records()
+        recalc_count = recalc_res.get("updated_count", 0)
+        msg = f"'{title}' soru maddesi ve ceza puanları güncellendi, tüm veritabanındaki ({recalc_count:,} adet) kayıt yeni puanlara göre yeniden hesaplandı."
+    else:
+        msg = f"'{title}' soru maddesi ve ceza puanları güncellendi. Yeni ve düzeltilecek mutabakat kayıtları için geçerli olacaktır (Geçmiş kayıtlar korundu)."
+
+    return RedirectResponse(url=f"/admin/questions?msg={msg}&msg_type=success", status_code=302)
+
+
+@app.post("/admin/questions/{question_id}/toggle-status")
+def admin_toggle_question_action(
+    request: Request,
+    question_id: int,
+    apply_scope: str = Form("future")
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login", status_code=302)
+
+    res = toggle_question_status(question_id)
+    if not res.get("success"):
+        return RedirectResponse(url=f"/admin/questions?msg={res.get('error')}&msg_type=error", status_code=302)
+
+    if apply_scope == "all":
+        recalc_res = recalculate_all_records()
+        recalc_count = recalc_res.get("updated_count", 0)
+        msg = f"{res.get('message')} ve tüm veritabanı ({recalc_count:,} adet kayıt) yeniden hesaplandı."
+    else:
+        msg = f"{res.get('message')} (Geçmiş kayıtlar korundu, sadece yeni/düzeltilecek kayıtlarda geçerli)."
+
+    return RedirectResponse(url=f"/admin/questions?msg={msg}&msg_type=success", status_code=302)
+
+
+@app.post("/admin/questions/{question_id}/delete")
+def admin_delete_question_action(
+    request: Request,
+    question_id: int,
+    apply_scope: str = Form("future")
+):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse(url="/login", status_code=302)
+
+    res = delete_question(question_id)
+    if not res.get("success"):
+        return RedirectResponse(url=f"/admin/questions?msg={res.get('error')}&msg_type=error", status_code=302)
+
+    if apply_scope == "all":
+        recalc_res = recalculate_all_records()
+        recalc_count = recalc_res.get("updated_count", 0)
+        msg = f"{res.get('message')} ve tüm veritabanı ({recalc_count:,} adet kayıt) yeniden hesaplandı."
+    else:
+        msg = f"{res.get('message')} (Geçmiş kayıtlar korundu)."
+
+    return RedirectResponse(url=f"/admin/questions?msg={msg}&msg_type=success", status_code=302)
+
+

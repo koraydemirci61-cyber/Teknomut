@@ -474,46 +474,32 @@ def revert_batch_by_id(batch_id: str, reverted_by: str = "admin") -> Dict[str, A
 
 def recalculate_all_records() -> Dict[str, Any]:
     """
-    Tüm veritabanındaki hakediş, soru puanları ve fark hesaplarını güncel model fiyatlarına göre yeniden hesaplar.
+    Tüm veritabanındaki hakediş, soru puanları ve fark hesaplarını güncel soru kurallarına ve model fiyatlarına göre yeniden hesaplar.
     """
+    from .calculator import get_all_questions
+    active_questions = get_all_questions(include_inactive=False)
+
     conn = get_connection()
     cur = conn.cursor()
 
     cur.execute("SELECT LOWER(model_name), full_price FROM model_prices")
     price_map = {row[0].strip(): row[1] for row in cur.fetchall()}
 
-    cur.execute("""
-    SELECT id, model, full_price, voucher_amount,
-           q1_working, q2_btk, q3_home_faceid, q4_icloud,
-           q5_apple_body, q6_apple_screen, q7_apple_camera, q8_apple_battery,
-           q5_android_camera, q6_android_body, q7_android_screen
-    FROM mutabakat_records
-    """)
+    cur.execute("SELECT * FROM mutabakat_records")
     records = cur.fetchall()
 
     updated_count = 0
     for r in records:
-        answers = {
-            "q1_working": r["q1_working"] or "",
-            "q2_btk": r["q2_btk"] or "",
-            "q3_home_faceid": r["q3_home_faceid"] or "",
-            "q4_icloud": r["q4_icloud"] or "",
-            "q5_apple_body": r["q5_apple_body"] or "",
-            "q6_apple_screen": r["q6_apple_screen"] or "",
-            "q7_apple_camera": r["q7_apple_camera"] or "",
-            "q8_apple_battery": r["q8_apple_battery"] or "",
-            "q5_android_camera": r["q5_android_camera"] or "",
-            "q6_android_body": r["q6_android_body"] or "",
-            "q7_android_screen": r["q7_android_screen"] or ""
-        }
+        r_dict = dict(r)
+        brand = r_dict.get("brand") or ""
+        model_clean = (r_dict.get("model") or "").strip().lower()
+        full_price = price_map.get(model_clean, r_dict.get("full_price") or 0.0)
+        voucher_amt = r_dict.get("voucher_amount") or 0.0
+        if full_price <= 0 and voucher_amt > 0:
+            full_price = voucher_amt
 
-        model_clean = (r["model"] or "").strip().lower()
-        full_price = price_map.get(model_clean, r["full_price"] or 0.0)
-        if full_price <= 0 and r["voucher_amount"] > 0:
-            full_price = r["voucher_amount"]
-
-        penalty = calculate_penalty_points(answers)
-        calc_price, diff = calculate_valuation(full_price, penalty, r["voucher_amount"] or 0.0)
+        penalty = calculate_penalty_points(r_dict, questions=active_questions, brand=brand)
+        calc_price, diff = calculate_valuation(full_price, penalty, voucher_amt)
 
         cur.execute("""
         UPDATE mutabakat_records SET

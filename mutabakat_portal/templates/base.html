@@ -60,14 +60,18 @@
 
                     <!-- Nav Linkleri -->
                     <div class="hidden md:flex items-center space-x-1 pl-8">
+                        {% if current_user.role in ['admin', 'gozetmen', 'reviewer'] %}
                         <a href="/dashboard" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'dashboard' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
                             <i class="fa-solid fa-chart-line text-xs"></i>
                             <span>Dashboard</span>
                         </a>
+                        {% endif %}
+
                         <a href="/mutabakat" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'mutabakat' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
                             <i class="fa-solid fa-list-check text-xs"></i>
                             <span>Mutabakat Listesi</span>
                         </a>
+
                         {% if current_user.role == 'admin' %}
                         <a href="/import/daily" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'daily_upload' %}bg-orange-500/20 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
                             <i class="fa-solid fa-cloud-arrow-up text-xs text-orange-400"></i>
@@ -77,11 +81,19 @@
                             <i class="fa-solid fa-trash-can text-xs text-rose-400"></i>
                             <span>Toplu Silme</span>
                         </a>
-                        {% endif %}
+                        <a href="/admin/users" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'users' %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
+                            <i class="fa-solid fa-users-gear text-xs text-amber-400"></i>
+                            <span>Kullanıcılar</span>
+                        </a>
+                        <a href="/admin/questions" class="px-3 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 {% if active_page == 'questions' %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% else %}text-slate-300 hover:bg-slate-700/60{% endif %}">
+                            <i class="fa-solid fa-list-check text-xs text-amber-400"></i>
+                            <span>Hasar Kriterleri</span>
+                        </a>
                         <a href="/export/excel" class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600/80 hover:bg-emerald-600 text-white transition flex items-center space-x-1.5 ml-2 shadow-sm">
                             <i class="fa-solid fa-file-excel text-xs"></i>
                             <span>Excel İndir</span>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -92,8 +104,12 @@
                         <div class="text-[10px] text-slate-400">
                             {% if current_user.role == 'admin' %}
                                 <span class="text-amber-400"><i class="fa-solid fa-shield-halved mr-1"></i>Yönetici</span>
+                            {% elif current_user.role == 'operator' %}
+                                <span class="text-orange-400"><i class="fa-solid fa-user-pen mr-1"></i>Operatör</span>
+                            {% elif current_user.role in ['gozetmen', 'reviewer'] %}
+                                <span class="text-indigo-400"><i class="fa-solid fa-eye mr-1"></i>Gözetmen</span>
                             {% else %}
-                                <span class="text-orange-400"><i class="fa-solid fa-user-check mr-1"></i>Operatör</span>
+                                <span class="text-slate-400">{{ current_user.role }}</span>
                             {% endif %}
                         </div>
                     </div>
