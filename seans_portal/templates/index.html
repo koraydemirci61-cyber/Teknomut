@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="heading">
+  <div>
+    <p class="eyebrow">DESTEK BİLİŞİM</p>
+    <h1>{{ settings.title }}</h1>
+    <p>Departmanınızı seçin, personellerinizin hangi eğitim oturumuna katılacağını işaretleyin ve kaydedin.</p>
+  </div>
+</div>
+
+<section class="card select-card">
+  <label for="dept-select" class="dept-label">
+    <strong>Departmanınızı Seçin:</strong>
+    <select id="dept-select" class="dept-dropdown">
+      <option value="">— Lütfen Departmanınızı Seçiniz ({{ departments|length }} Departman) —</option>
+      {% for d in departments %}
+      <option value="{{ d.id }}" {% if selected_dept_id == d.id %}selected{% endif %}>
+        {{ d.name }} ({{ d.total }} Personel · {{ d.assigned + d.unavailable }}/{{ d.total }} Tamamlandı)
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+</section>
+
+{% if not current_dept %}
+<section class="card empty-guide">
+  <div class="guide-content">
+    <div class="guide-icon">📋</div>
+    <h2>Lütfen yukarıdan departmanınızı seçin</h2>
+    <p>Departmanınızı seçtiğinizde personellerinizin hazır listesi ve belirlenen 4 oturum saati ekrana gelecektir.</p>
+    <ul class="guide-list">
+      <li>✓ İsim veya sicil numarası yazmanız gerekmez; personel listeniz hazırdır.</li>
+      <li>✓ 4 oturum saatinden (09:30-10:30, 10:45-11:45, 13:30-14:30, 14:45-15:45) birini işaretleyebilirsiniz.</li>
+      <li>✓ Eğitime katılamayacak personeliniz varsa <b>Katılamayacak</b> seçip nedenini yazabilirsiniz.</li>
+      <li>✓ İşiniz bittiğinde alttaki <b>Değişiklikleri Kaydet</b> butonuna basmanız yeterlidir.</li>
+    </ul>
+  </div>
+</section>
+{% else %}
+
+<div class="stats">
+  <div class="card"><strong>{{ people|length }}</strong>Personeliniz</div>
+  <div class="card"><strong>{{ assigned_count }}</strong>Katılacak</div>
+  <div class="card"><strong>{{ unavailable_count }}</strong>Katılamayacak</div>
+  <div class="card"><strong>{{ pending_count }}</strong>Seçim Bekleyen</div>
+</div>
+
+<section class="card" id="roster" data-dept-id="{{ current_dept.id }}">
+  <div class="roster-header">
+    <div>
+      <h2>{{ current_dept.name }}</h2>
+      <p class="hint">Personelin katılacağı oturumu 4 saat seçeneğinden biri olarak işaretleyin. Katılamayacak personel için <b>Katılamayacak</b> seçip açıklama yazın.</p>
+    </div>
+  </div>
+
+  {% if settings.locked %}
+  <p class="notice">Oturum girişleri yönetici tarafından kapatılmıştır. Kayıtlı seçimlerinizi inceleyebilirsiniz.</p>
+  {% elif not sessions %}
+  <p class="notice">Yönetici henüz oturum tanımlamadı. Oturumlar tanımlandıktan sonra seçim yapabilirsiniz; varsa katılamayacak personelinizi şimdiden kaydedebilirsiniz.</p>
+  {% endif %}
+
+  <div class="filters">
+    <label>Personel veya işyeri ara
+      <input type="search" id="person-search" placeholder="Ad soyad veya işyeri yazın...">
+    </label>
+    <label class="check">
+      <input type="checkbox" id="only-pending"> Yalnız seçim bekleyenleri göster
+    </label>
+    {% if not settings.locked and sessions %}
+    <label>Görünen personele toplu oturum uygula
+      <select id="bulk-session">
+        <option value="">Seçilmedi</option>
+        {% for s in sessions %}
+        <option value="{{ s.id }}">{{ s.label }}</option>
+        {% endfor %}
+        <option value="absent">Katılamayacak</option>
+      </select>
+    </label>
+    <button type="button" class="secondary" id="apply-bulk">Görünenlere Uygula</button>
+    {% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">Personel Adı Soyadı</th>
+          <th style="width: 20%;">İşyeri</th>
+          <th style="width: 40%;">Katılacağı Eğitim Oturumu (4 Oturum Saati)</th>
+          <th style="width: 15%;">Son Kayıt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in people %}
+        <tr class="person-row"
+            data-id="{{ person.id }}"
+            data-version="{{ person.version }}"
+            data-original="{{ 'absent' if person.unavailable else (person.session_id or '') }}">
+          <td class="person-name">{{ person.name }}</td>
+          <td class="person-workplace">{{ person.workplace }}</td>
+          <td>
+            <fieldset class="session-choices" aria-label="{{ person.name }} için katılım" {% if settings.locked %}disabled{% endif %}>
+              <label class="session-choice">
+                <input class="person-session" type="radio" name="choice_{{ person.id }}" value="" {% if not person.session_id and not person.unavailable %}checked{% endif %}>
+                <span>Seçilmedi</span>
+              </label>
+              {% for s in sessions %}
+              <label class="session-choice">
+                <input class="person-session" type="radio" name="choice_{{ person.id }}" value="{{ s.id }}" {% if person.session_id == s.id %}checked{% endif %}>
+                <span>{{ s.label }}</span>
+              </label>
+              {% endfor %}
+              <label class="session-choice absent-choice">
+                <input class="person-session" type="radio" name="choice_{{ person.id }}" value="absent" {% if person.unavailable %}checked{% endif %}>
+                <span>Katılamayacak</span>
+              </label>
+            </fieldset>
+            <div class="absence-field" {% if not person.unavailable %}hidden{% endif %}>
+              <label>Katılamama Nedeni:
+                <textarea class="absence-reason" maxlength="500" rows="2"
+                          data-original="{{ person.absence_reason }}"
+                          placeholder="Katılamama nedenini buraya yazın..."
+                          {% if person.unavailable %}required{% endif %}
+                          {% if settings.locked %}disabled{% endif %}>{{ person.absence_reason }}</textarea>
+              </label>
+            </div>
+          </td>
+          <td class="updated-at">{{ person.updated_at|replace("T", " ") or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p id="empty-search" hidden>Aramanızla eşleşen personel bulunamadı.</p>
+
+  <div class="savebar">
+    <p id="save-status" role="status" aria-live="polite">Kaydedilmemiş değişiklik yok.</p>
+    <button type="button" id="save-assignments" disabled>Değişiklikleri Kaydet</button>
+    <a class="button secondary" href="/?dept_id={{ current_dept.id }}">Yenile</a>
+  </div>
+</section>
+{% endif %}
+
+<div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
+{% endblock %}

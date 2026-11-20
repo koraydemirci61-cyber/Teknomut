@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+  <p class="eyebrow">İŞLEM TAMAMLANAMADI</p><h1>Lütfen kontrol edin</h1>
+  <p role="alert">{{ error }}</p>
+  <button type="button" id="go-back">Geri dön</button>
+  <a class="button secondary" href="/katilim">Giriş bilgisi</a>
+</section>
+{% endblock %}

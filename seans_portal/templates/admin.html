@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="heading">
+  <div>
+    <p class="eyebrow">DESTEK BİLİŞİM YÖNETİM & RAPORLAMA</p>
+    <h1>{{ settings.title }}</h1>
+    <p>Oturumları yönetin, tek linki şeflerle paylaşın ve istediğiniz an Excel dökümünü alın.</p>
+  </div>
+  <div>
+    <a class="button secondary" href="/">← Oturum Seçim Ekranı</a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="card"><strong>{{ total }}</strong>Toplam Personel</div>
+  <div class="card"><strong style="color: #127f83;">{{ assigned }}</strong>Katılacak</div>
+  <div class="card"><strong style="color: #ce922a;">{{ unavailable }}</strong>Katılamayacak</div>
+  <div class="card"><strong style="color: #c0392b;">{{ pending }}</strong>Seçim Bekleyen</div>
+  <div class="card"><strong>{{ departments|length }}</strong>Birim</div>
+</div>
+
+<!-- ŞEFLERLE PAYLAŞILACAK TEK LİNK -->
+<section class="card share-card">
+  <h2>🔗 Departman Şefleriyle Paylaşılacak Tek Link</h2>
+  <p class="hint">Aşağıdaki linki tüm departman yöneticileriyle paylaşabilirsiniz. Her yönetici bu linke tıklayarak kendi departmanını seçer ve personellerinin seansını belirler. Ayrı ayrı linklere veya parolaya gerek yoktur.</p>
+  <div class="share-box">
+    <input id="share-link" type="text" readonly aria-label="Paylaşım linki">
+    <button type="button" id="copy-share-btn">Linki Kopyala</button>
+  </div>
+  <p id="share-msg" class="hint" role="status"></p>
+</section>
+
+<!-- TOPLU RAPOR VE DIŞA AKTARIM -->
+<section class="card excel-card">
+  <div class="heading" style="margin-bottom: 12px;">
+    <div>
+      <h2>📥 Toplu Katılım Raporu (Excel)</h2>
+      <p class="hint">Tüm {{ total }} personelin T.C. Kimlik No, Sicil No, Adı Soyadı, İşyeri, Departmanı, Katılacağı Oturum, Katılım Durumu ve Katılamama Nedeni tek bir Excel dosyasında toplanır. Oturum bazında toplamlar ayrı özet sayfadadır.</p>
+    </div>
+    <div>
+      <a class="button download-btn" href="/yonetim/excel">Excel Raporunu İndir (.xlsx)</a>
+    </div>
+  </div>
+  <div class="actions">
+    <a class="button secondary" href="/yonetim/yedek">Veritabanı Yedeğini İndir (.db)</a>
+    <a class="button secondary" href="/yonetim">Sayıları Yenile</a>
+  </div>
+</section>
+
+<div class="grid">
+  <!-- SEANS TANIMLAMA -->
+  <section class="card">
+    <h2>1. Oturum / Seans Tanımlama</h2>
+    <p class="hint">Personellerin katılabileceği seansları buradan ekleyebilirsiniz.</p>
+    <form action="/yonetim/seans" method="post">
+      <label>Oturum / Seans Adı
+        <input name="label" placeholder="Örn. 1. Oturum (veya Sabah Grubu)" required maxlength="100">
+      </label>
+      <label>Tarih ve Başlangıç Saati
+        <input type="datetime-local" name="starts_at" required>
+      </label>
+      <button type="submit">Seansı Ekle</button>
+    </form>
+
+    <div style="margin-top: 24px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">Tanımlı Seanslar</h3>
+      {% for session in sessions %}
+      <div class="session">
+        <div>
+          <b>{{ session.label }}</b><br>
+          <span>{{ session.starts_at|replace("T", " · ") }} · <strong>{{ session.assigned }} kişi</strong></span>
+        </div>
+        <form action="/yonetim/seans/{{ session.id }}/sil" method="post" data-confirm="Bu seans silinsin mi?">
+          <button class="secondary" {% if session.assigned %}disabled title="Bu seansa atanmış personel varken silinemez"{% endif %}>Sil</button>
+        </form>
+      </div>
+      {% else %}
+      <p class="notice">Henüz seans eklenmedi. Yukarıdaki formdan seans ekleyebilirsiniz.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- AYARLAR -->
+  <section class="card">
+    <h2>2. Genel Ayarlar</h2>
+    <form action="/yonetim/settings" method="post">
+      <label>Eğitim / Etkinlik Başlığı
+        <input name="title" value="{{ settings.title }}" required maxlength="160">
+      </label>
+      <label class="check">
+        <input type="checkbox" name="locked" {% if settings.locked %}checked{% endif %}>
+        Seans girişlerini kapat (Şeflerin yeni seçim yapmasını engeller)
+      </label>
+      <button type="submit">Ayarları Kaydet</button>
+    </form>
+    {% if settings.locked %}
+    <p class="notice" style="margin-top: 16px;">Girişler kapatıldı. Şefler sadece mevcut seçimleri görebilir, değiştiremez.</p>
+    {% endif %}
+  </section>
+</div>
+
+<!-- DEPARTMAN BAZLI DURUM TABLOSU -->
+<section class="card">
+  <h2>3. Departman İlerleme Durumu</h2>
+  <p class="hint">Her departmanın personel sayısı ve seans belirleme durumu aşağıda listelenmiştir.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Departman</th>
+          <th>Toplam Personel</th>
+          <th>Katılacak</th>
+          <th>Katılamayacak</th>
+          <th>Seçim Bekleyen</th>
+          <th>İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in departments %}
+        <tr>
+          <td><strong>{{ d.name }}</strong></td>
+          <td>{{ d.total }}</td>
+          <td><span style="color: #127f83; font-weight: 600;">{{ d.assigned }}</span></td>
+          <td><span style="color: #ce922a; font-weight: 600;">{{ d.unavailable }}</span></td>
+          <td><span style="color: {% if d.total - d.assigned - d.unavailable > 0 %}#c0392b{% else %}#7f8c8d{% endif %}; font-weight: 600;">{{ d.total - d.assigned - d.unavailable }}</span></td>
+          <td>
+            <a class="button secondary" style="padding: 6px 12px; font-size: 13px;" href="/?dept_id={{ d.id }}">Bu Departmanı Aç</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

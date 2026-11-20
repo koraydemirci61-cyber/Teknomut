@@ -1,0 +1,64 @@
+:root{font-family:"Segoe UI",Arial,sans-serif;color:#18334d;background:#f2f5f9;font-size:15px}
+*{box-sizing:border-box}body{margin:0}a{color:#135e8a}button,input,select,textarea{font:inherit}
+.topbar{background:#102b46;color:#dbe7f3;padding:18px max(24px,calc((100% - 1250px)/2));display:flex;justify-content:space-between;gap:20px;align-items:center}
+.brand{font-size:19px;letter-spacing:2px;font-weight:800;color:white;text-decoration:none;white-space:nowrap}.brand span{font-weight:400;color:#81d6cf}
+.topbar-nav{display:flex;gap:12px;align-items:center}
+.nav-link{display:inline-block;padding:8px 14px;border-radius:6px;background:rgba(255,255,255,0.12);color:#ffffff;text-decoration:none;font-weight:600;font-size:13px;transition:background .2s}
+.nav-link:hover{background:rgba(255,255,255,0.22);color:#ffffff}
+main{max-width:1300px;margin:32px auto;padding:0 24px}h1{font-size:clamp(26px,3vw,36px);letter-spacing:-1px;margin:6px 0 12px}h2{font-size:21px;margin:0 0 14px}p{line-height:1.65}
+.eyebrow{font-size:12px;letter-spacing:2px;font-weight:700;color:#157d80;margin:0}.heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:24px}
+.card{background:white;border:1px solid #dce5ee;border-radius:15px;padding:24px;margin-bottom:24px;box-shadow:0 4px 18px #19324c05}
+.narrow{max-width:520px;margin:65px auto}.narrow h1{line-height:1.2}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;margin-bottom:24px}.stats .card{color:#607386;margin-bottom:0}.stats strong{display:block;font-size:36px;color:#17364e;margin-bottom:5px}
+
+/* Departman Seçim Kartı */
+.select-card{background:linear-gradient(135deg,#ffffff 0%,#f0f7f6 100%);border:2px solid #b7dfdb;padding:20px 24px}
+.dept-label{font-size:16px;color:#102b46;margin:0}
+.dept-label strong{display:block;margin-bottom:8px;font-size:17px;color:#0e585b}
+.dept-dropdown{font-size:16px;padding:12px 14px;border:2px solid #157d80;border-radius:10px;font-weight:600;color:#102b46;background:#fff;cursor:pointer}
+.dept-dropdown:focus{outline:3px solid #81d6cf}
+
+/* Boş Durum Rehberi */
+.empty-guide{text-align:center;padding:48px 24px}
+.guide-content{max-width:620px;margin:0 auto}
+.guide-icon{font-size:48px;margin-bottom:12px}
+.guide-list{text-align:left;list-style:none;padding:0;margin:24px 0 0;display:inline-block}
+.guide-list li{padding:8px 0;color:#2c4964;font-size:15px}
+
+/* Paylaşım Kutusu */
+.share-card{border-left:5px solid #157d80}
+.share-box{display:flex;gap:10px;align-items:stretch;margin-top:12px}
+.share-box input{margin:0;font-family:Consolas,monospace;font-size:15px;background:#f8fafc;font-weight:600;color:#102b46}
+.share-box button{white-space:nowrap;padding:12px 20px}
+
+/* Excel Kartı */
+.excel-card{border-left:5px solid #27ae60}
+.download-btn{background:#27ae60;font-size:16px;padding:12px 24px}
+.download-btn:hover{background:#219653}
+
+label{display:block;font-weight:600;font-size:14px;margin:12px 0}input,select,textarea{width:100%;border:1px solid #c9d6e3;border-radius:8px;padding:11px 12px;background:white;color:#18334d;margin-top:7px}
+input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:3px solid #a5d9ef;outline-offset:2px}button,.button{display:inline-block;border:1px solid transparent;border-radius:8px;padding:11px 17px;background:#127f83;color:white;font-weight:600;text-decoration:none;cursor:pointer}
+button:hover,.button:hover{filter:brightness(.96)}.secondary{background:#edf3f8;border-color:#d3dfeb;color:#214764}button:disabled,select:disabled{opacity:.55;cursor:not-allowed}
+.hint{color:#65788b;font-size:13px}.notice{border-left:4px solid #d69a23;background:#fff7e6;padding:13px 16px;border-radius:6px;font-size:14px}.check{display:flex;align-items:center;gap:9px}.check input{width:auto;margin:0}
+form+form{border-top:1px solid #e1e8ef;margin-top:22px;padding-top:12px}.session{border-top:1px solid #e1e8ef;padding:14px 0;display:flex;justify-content:space-between;gap:10px;align-items:center}.session span{font-size:13px;color:#65788b}
+.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;text-align:left}th{background:#f3f6fa;color:#61788c;font-size:12px;letter-spacing:.5px;padding:13px 12px}td{padding:14px 12px;border-bottom:1px solid #e8edf3;vertical-align:middle}td select{min-width:260px;margin:0}.person-name{font-weight:600;font-size:15px;color:#102b46}.updated-at{font-size:12px;color:#65788b;white-space:nowrap}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+.session-choices{border:0;padding:0;margin:0;display:flex;gap:8px;flex-wrap:wrap;min-width:290px}
+.session-choice{display:flex;align-items:center;gap:8px;margin:0;border:1px solid #d3dfeb;border-radius:8px;padding:9px 12px;background:#f7f9fb;cursor:pointer;transition:all .15s}
+.session-choice:hover{background:#edf4f9;border-color:#a5c0d6}
+.session-choice input{width:auto;margin:0;accent-color:#127f83;cursor:pointer}
+.session-choice:has(input:checked){background:#e5f5f2;border-color:#127f83;font-weight:600}
+.session-choice small{display:block;font-size:11px;font-weight:400;margin-top:2px;color:#577085}
+.absent-choice:has(input:checked){background:#fff4e5;border-color:#ce922a;color:#8a5e12}
+.absence-field{font-size:13px;margin:12px 0 0}
+.absence-field label{font-weight:600;color:#c0392b;margin:0}
+.absence-reason{resize:vertical;min-height:60px;border-color:#f5c6cb}
+.absence-reason:focus{border-color:#c0392b;outline:3px solid #fadbd8}
+.session-choices:disabled{opacity:.6}
+.filters{display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin:20px 0}.filters label{margin:0}.filters .check{padding-bottom:13px}
+.savebar{position:sticky;bottom:0;background:#fff;border-top:2px solid #127f83;display:flex;align-items:center;gap:14px;padding:16px 20px;margin:20px -24px -24px -24px;border-bottom-left-radius:15px;border-bottom-right-radius:15px;box-shadow:0 -4px 16px rgba(0,0,0,0.06);flex-wrap:wrap}
+.savebar p{flex:1;min-width:220px;font-weight:600}
+.savebar button{padding:12px 24px;font-size:16px;background:#127f83}
+.savebar button:hover{background:#0e6569}
+footer{text-align:center;color:#6d7e8e;padding:24px;font-size:13px}[hidden]{display:none!important}
+@media(max-width:760px){.grid{grid-template-columns:1fr;gap:0}.topbar-nav{display:flex}.main{padding:0 14px;margin-top:18px}.card{padding:18px}.heading{align-items:start}.heading h1{font-size:24px}.share-box{flex-direction:column}.filters{align-items:stretch}.filters label{width:100%}.stats{gap:10px}.stats strong{font-size:28px}.savebar{margin:16px -18px -18px -18px;padding:12px 16px}.savebar .button,.savebar button{flex:1}}

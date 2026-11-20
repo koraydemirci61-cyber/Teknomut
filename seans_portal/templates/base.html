@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Destek Bilişim - İSG Eğitimi Oturum Planı{% endblock %}</title>
+  <link rel="stylesheet" href="/static/portal.css">
+  <script src="/static/portal.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">DESTEK BİLİŞİM <span>İSG EĞİTİMİ OTURUM PLANI</span></a>
+    <div class="topbar-nav">
+      {% if request.url.path == "/yonetim" %}
+        <a class="nav-link" href="/">← Oturum Seçim Ekranı</a>
+      {% else %}
+        <a class="nav-link" href="/yonetim">📊 Yönetim & Excel Raporu</a>
+      {% endif %}
+    </div>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>Destek Bilişim İş Sağlığı ve Güvenliği Eğitimi Oturum Planı · Veriler yerel sunucuda saklanır.</footer>
+</body>
+</html>
